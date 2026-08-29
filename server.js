@@ -13,7 +13,7 @@ const io = new Server(server, {
   cors: { origin: '*', methods: ['GET', 'POST'] }
 });
 
-app.use(express.static(path.join(__dirname, 'public')));
+app.use(express.static(__dirname));
 
 const PORT = process.env.PORT || 3000;
 const ROUND_SECONDS = 80;
