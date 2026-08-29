@@ -1,4 +1,4 @@
-const socket = io(https://doodle-duel-s2op.onrender.com);
+const socket = io();
 
 let myId = null;
 let hostId = null;
