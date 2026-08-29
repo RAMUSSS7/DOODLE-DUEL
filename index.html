@@ -1,0 +1,124 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>Doodle Duel</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+<div class="chalk-dust"></div>
+
+<!-- HOME SCREEN -->
+<section id="screen-home" class="screen active">
+  <div class="board-frame home-card">
+    <h1 class="logo">Doodle<span class="logo-accent">Duel</span></h1>
+    <p class="tagline">Grab your chalk. Guess the doodle. Beat the clock.</p>
+
+    <div class="field">
+      <label for="name-input">Your name</label>
+      <input id="name-input" maxlength="16" placeholder="e.g. Amine" autocomplete="off">
+    </div>
+
+    <button id="create-room-btn" class="btn btn-primary">Create a Room</button>
+
+    <div class="divider"><span>or join one</span></div>
+
+    <div class="field-row">
+      <input id="code-input" maxlength="5" placeholder="ROOM CODE" autocomplete="off" style="text-transform:uppercase">
+      <button id="join-room-btn" class="btn btn-secondary">Join</button>
+    </div>
+
+    <p id="home-error" class="error-text"></p>
+  </div>
+</section>
+
+<!-- LOBBY SCREEN -->
+<section id="screen-lobby" class="screen">
+  <div class="board-frame lobby-card">
+    <p class="eyebrow">Room code — share it with friends</p>
+    <div class="room-code-display" id="room-code-display">-----</div>
+
+    <div class="lobby-players">
+      <h3>Players <span id="lobby-count">(0)</span></h3>
+      <ul id="lobby-player-list" class="player-list"></ul>
+    </div>
+
+    <button id="start-game-btn" class="btn btn-primary">Start Game</button>
+    <p id="lobby-hint" class="hint-text">Waiting for the host to start the game…</p>
+  </div>
+</section>
+
+<!-- CHOOSING WORD OVERLAY (shown on top of game screen) -->
+<div id="choose-overlay" class="overlay hidden">
+  <div class="board-frame choose-card">
+    <p class="eyebrow" id="choose-heading">Pick a word to draw</p>
+    <div id="choose-options" class="choose-options"></div>
+    <div class="choose-timer" id="choose-timer">10</div>
+  </div>
+</div>
+
+<!-- GAME SCREEN -->
+<section id="screen-game" class="screen">
+  <div class="game-topbar">
+    <div class="topbar-item">Round <span id="round-label">1/6</span></div>
+    <div class="timer-track"><div id="timer-fill" class="timer-fill"></div></div>
+    <div class="topbar-item word-display" id="word-display">_ _ _ _</div>
+  </div>
+
+  <div class="game-main">
+    <aside class="sidebar">
+      <h3>Players</h3>
+      <ul id="game-player-list" class="player-list"></ul>
+    </aside>
+
+    <div class="canvas-wrap">
+      <div class="canvas-paper">
+        <canvas id="draw-canvas"></canvas>
+        <div id="drawer-banner" class="drawer-banner hidden"></div>
+      </div>
+      <div id="toolbar" class="toolbar hidden">
+        <div class="colors" id="color-swatches"></div>
+        <div class="tool-group">
+          <button class="tool-btn" id="brush-small" title="Thin">●</button>
+          <button class="tool-btn" id="brush-large" title="Thick">⬤</button>
+          <button class="tool-btn" id="eraser-btn" title="Eraser">🧽</button>
+          <button class="tool-btn" id="clear-btn" title="Clear canvas">🗑</button>
+        </div>
+      </div>
+    </div>
+
+    <div class="chatbox">
+      <div id="chat-log" class="chat-log"></div>
+      <form id="guess-form" class="guess-form">
+        <input id="guess-input" placeholder="Type your guess…" autocomplete="off">
+        <button type="submit" class="btn btn-primary btn-small">Send</button>
+      </form>
+    </div>
+  </div>
+</section>
+
+<!-- ROUND END OVERLAY -->
+<div id="roundend-overlay" class="overlay hidden">
+  <div class="board-frame roundend-card">
+    <p class="eyebrow">The word was</p>
+    <div class="revealed-word" id="revealed-word">WORD</div>
+    <p class="hint-text">Next round starting soon…</p>
+  </div>
+</div>
+
+<!-- GAME END SCREEN -->
+<section id="screen-end" class="screen">
+  <div class="board-frame end-card">
+    <h2 class="eyebrow">Final Scores</h2>
+    <ol id="final-scoreboard" class="scoreboard"></ol>
+    <button id="play-again-btn" class="btn btn-primary">Play Again</button>
+    <button id="back-home-btn" class="btn btn-secondary">Back to Home</button>
+  </div>
+</section>
+
+<script src="/socket.io/socket.io.js"></script>
+<script src="client.js"></script>
+</body>
+</html>
