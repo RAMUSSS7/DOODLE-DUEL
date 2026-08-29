@@ -12,7 +12,6 @@ let lastPoint = null;
 
 const COLORS = ['#2c2a24', '#ff6b6b', '#ffcf4d', '#5aa9ff', '#4fd6b0', '#a86bff', '#ff9f4d', '#ffffff'];
 
-// ---------- Screen helpers ----------
 function showScreen(id) {
   document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
   document.getElementById(id).classList.add('active');
@@ -20,7 +19,6 @@ function showScreen(id) {
 function showOverlay(id) { document.getElementById(id).classList.remove('hidden'); }
 function hideOverlay(id) { document.getElementById(id).classList.add('hidden'); }
 
-// ---------- Home screen ----------
 const nameInput = document.getElementById('name-input');
 const codeInput = document.getElementById('code-input');
 const homeError = document.getElementById('home-error');
@@ -45,7 +43,6 @@ socket.on('join-error', ({ message }) => {
   homeError.textContent = message;
 });
 
-// ---------- Lobby ----------
 socket.on('room-joined', ({ code, you, hostId: hId, players }) => {
   myId = you;
   hostId = hId;
@@ -91,9 +88,9 @@ function escapeHtml(str) {
   return div.innerHTML;
 }
 
-// ---------- Choosing word ----------
 socket.on('choosing', ({ drawerId, drawerName, roundNumber, totalRounds, chooseSeconds }) => {
   showScreen('screen-game');
+  resizeCanvas();
   isDrawer = drawerId === myId;
   document.getElementById('round-label').textContent = `${roundNumber}/${totalRounds}`;
   document.getElementById('chat-log').innerHTML = '';
@@ -133,10 +130,10 @@ socket.on('choose-word', ({ options }) => {
   });
 });
 
-// ---------- Round start / drawing ----------
 socket.on('round-start', ({ drawerId, drawerName, maskedWord, timeLeft, roundNumber, totalRounds }) => {
   hideOverlay('choose-overlay');
   hideOverlay('roundend-overlay');
+  resizeCanvas();
   isDrawer = drawerId === myId;
   document.getElementById('round-label').textContent = `${roundNumber}/${totalRounds}`;
   document.getElementById('word-display').textContent = maskedWord.split('').join(' ');
@@ -172,7 +169,6 @@ function setTimerFill(timeLeft) {
   document.getElementById('timer-fill').style.width = pct + '%';
 }
 
-// ---------- Round end ----------
 socket.on('round-end', ({ word, players }) => {
   renderPlayerList(players);
   document.getElementById('revealed-word').textContent = word.toUpperCase();
@@ -180,7 +176,6 @@ socket.on('round-end', ({ word, players }) => {
   document.getElementById('toolbar').classList.add('hidden');
 });
 
-// ---------- Game end ----------
 socket.on('game-end', ({ players }) => {
   showScreen('screen-end');
   const board = document.getElementById('final-scoreboard');
@@ -199,7 +194,6 @@ socket.on('back-to-lobby', () => {
   showScreen('screen-lobby');
 });
 
-// ---------- Chat / guessing ----------
 const chatLog = document.getElementById('chat-log');
 document.getElementById('guess-form').addEventListener('submit', e => {
   e.preventDefault();
@@ -224,7 +218,6 @@ function addChat(html, isSystem) {
   chatLog.scrollTop = chatLog.scrollHeight;
 }
 
-// ---------- Canvas drawing ----------
 const canvas = document.getElementById('draw-canvas');
 const ctx = canvas.getContext('2d');
 
@@ -290,7 +283,6 @@ function clearCanvasLocal() {
   ctx.fillRect(0, 0, canvas.width, canvas.height);
 }
 
-// ---------- Toolbar ----------
 const swatchBox = document.getElementById('color-swatches');
 COLORS.forEach((c, i) => {
   const sw = document.createElement('div');
