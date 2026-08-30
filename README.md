@@ -8,13 +8,27 @@ no framework needed.
 ## What's inside
 ```
 doodle-duel/
-├── server.js         # game server: rooms, rounds, scoring, drawing relay
+├── server.js         # game server: rooms, rounds, scoring, drawing relay, reconnect
 ├── package.json
-└── public/
-    ├── index.html    # all screens (home, lobby, game, results)
-    ├── style.css     # chalkboard / paper visual theme
-    └── client.js     # socket handling + canvas drawing
+├── index.html        # all screens (home, lobby, game, results)
+├── style.css         # chalkboard / paper visual theme
+└── client.js         # socket handling + canvas drawing
 ```
+All files live at the root of the project (no `public/` subfolder) — keep it
+that way both locally and in your GitHub repo, or the server won't find them.
+
+## Features
+- Rooms with a 5-letter code, 2–8 players
+- Word packs: **English**, **Arabic (العربية)**, or a **custom list** the
+  host types in before starting
+- No word repeats within the same game
+- Progressive letter hints as the timer runs down
+- 🥇 Fastest-guesser bonus + 🔥 guess streak bonus (both shown live)
+- Emoji reactions guessers can throw while someone draws
+- Automatic reconnect: if a player's connection drops, they keep their seat,
+  score, and streak for 2 minutes and resume exactly where the game left off
+- Confetti + a little win jingle on the final results screen
+- End-game badges: Best Drawer and Fastest Guesser
 
 ## Run it locally
 ```bash
@@ -67,7 +81,7 @@ Render (Option A above). The client just needs to know where to connect:
 
 1. Deploy `server.js` (Option A/B) and note your server's URL, e.g.
    `https://doodle-duel.onrender.com`.
-2. In `public/client.js`, change the very first line from:
+2. In `client.js`, change the very first line from:
    ```js
    const socket = io();
    ```
@@ -75,10 +89,9 @@ Render (Option A above). The client just needs to know where to connect:
    ```js
    const socket = io('https://doodle-duel.onrender.com');
    ```
-3. Zip only the **public/** folder's contents (`index.html`, `style.css`,
-   `client.js` at the root of the zip — not inside a subfolder) and upload
-   that zip as your CrazyGames HTML5 build. `index.html` must be at the root
-   of the zip.
+3. Zip `index.html`, `style.css`, and `client.js` together — at the root of
+   the zip, not inside a folder — and upload that zip as your CrazyGames
+   HTML5 build. `index.html` must be at the root of the zip.
 4. In `server.js`, tighten the CORS setting before going live so random
    sites can't connect to your server:
    ```js

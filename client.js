@@ -1,17 +1,33 @@
 const socket = io();
 
-let myId = null;
-let hostId = null;
+// ---------- Persistent identity (for auto-reconnect) ----------
+function uuid() {
+  return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, c => {
+    const r = (Math.random() * 16) | 0;
+    const v = c === 'x' ? r : (r & 0x3) | 0x8;
+    return v.toString(16);
+  });
+}
+let myToken = localStorage.getItem('dd_token');
+if (!myToken) { myToken = uuid(); localStorage.setItem('dd_token', myToken); }
+const savedRoom = localStorage.getItem('dd_room');
+const savedName = localStorage.getItem('dd_name') || '';
+
+let hostToken = null;
 let roomCode = null;
 let isDrawer = false;
+let currentWordLength = 0;
 let currentColor = '#2c2a24';
 let currentSize = 4;
 let erasing = false;
 let drawing = false;
 let lastPoint = null;
+let myScoreCache = 0;
 
 const COLORS = ['#2c2a24', '#ff6b6b', '#ffcf4d', '#5aa9ff', '#4fd6b0', '#a86bff', '#ff9f4d', '#ffffff'];
+const REACTIONS = ['😂', '🔥', '👏', '😮', '❤️', '🤔'];
 
+// ---------- Screen helpers ----------
 function showScreen(id) {
   document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
   document.getElementById(id).classList.add('active');
@@ -19,15 +35,18 @@ function showScreen(id) {
 function showOverlay(id) { document.getElementById(id).classList.remove('hidden'); }
 function hideOverlay(id) { document.getElementById(id).classList.add('hidden'); }
 
+// ---------- Home screen ----------
 const nameInput = document.getElementById('name-input');
 const codeInput = document.getElementById('code-input');
 const homeError = document.getElementById('home-error');
+nameInput.value = savedName;
 
 document.getElementById('create-room-btn').addEventListener('click', () => {
   const name = nameInput.value.trim();
   if (!name) return (homeError.textContent = 'Type your name first.');
   homeError.textContent = '';
-  socket.emit('create-room', { name });
+  localStorage.setItem('dd_name', name);
+  socket.emit('create-room', { name, token: myToken });
 });
 
 document.getElementById('join-room-btn').addEventListener('click', () => {
@@ -36,19 +55,37 @@ document.getElementById('join-room-btn').addEventListener('click', () => {
   if (!name) return (homeError.textContent = 'Type your name first.');
   if (!code) return (homeError.textContent = 'Type a room code.');
   homeError.textContent = '';
-  socket.emit('join-room', { name, code });
+  localStorage.setItem('dd_name', name);
+  socket.emit('join-room', { name, code, token: myToken });
 });
 
 socket.on('join-error', ({ message }) => {
   homeError.textContent = message;
+  document.getElementById('reconnect-msg').classList.add('hidden');
 });
 
-socket.on('room-joined', ({ code, you, hostId: hId, players }) => {
-  myId = you;
-  hostId = hId;
+// ---------- Auto-reconnect on load / socket reconnect ----------
+function attemptAutoRejoin() {
+  const room = localStorage.getItem('dd_room');
+  const name = localStorage.getItem('dd_name');
+  if (room && name) {
+    document.getElementById('reconnect-msg').classList.remove('hidden');
+    socket.emit('join-room', { name, code: room, token: myToken });
+  }
+}
+socket.on('connect', () => {
+  attemptAutoRejoin();
+});
+
+// ---------- Lobby ----------
+socket.on('room-joined', ({ code, you, hostToken: hT, players, wordPack, gameState }) => {
+  hostToken = hT;
   roomCode = code;
+  localStorage.setItem('dd_room', code);
   document.getElementById('room-code-display').textContent = code;
-  showScreen('screen-lobby');
+  document.getElementById('reconnect-msg').classList.add('hidden');
+  setWordPackUI(wordPack);
+  if (gameState === 'lobby') showScreen('screen-lobby');
   renderPlayerList(players);
 });
 
@@ -56,13 +93,25 @@ document.getElementById('start-game-btn').addEventListener('click', () => {
   socket.emit('start-game');
 });
 
-socket.on('players-update', ({ players, hostId: hId }) => {
-  hostId = hId;
+document.getElementById('leave-room-btn').addEventListener('click', () => {
+  socket.emit('leave-room');
+  localStorage.removeItem('dd_room');
+  location.reload();
+});
+
+socket.on('back-to-lobby', ({ wordPack }) => {
+  showScreen('screen-lobby');
+  setWordPackUI(wordPack);
+});
+
+socket.on('players-update', ({ players, hostToken: hT }) => {
+  hostToken = hT;
   renderPlayerList(players);
-  const iAmHost = myId === hostId;
+  const iAmHost = myToken === hostToken;
   document.getElementById('start-game-btn').style.display = iAmHost ? 'block' : 'none';
   document.getElementById('lobby-hint').style.display = iAmHost ? 'none' : 'block';
   document.getElementById('lobby-count').textContent = `(${players.length})`;
+  document.getElementById('wordpack-picker').style.display = iAmHost ? 'block' : 'none';
 });
 
 function renderPlayerList(players) {
@@ -74,9 +123,11 @@ function renderPlayerList(players) {
       const li = document.createElement('li');
       if (p.isDrawer) li.classList.add('is-drawer');
       if (p.guessed) li.classList.add('has-guessed');
+      if (!p.connected) li.classList.add('disconnected');
       const dot = `<span class="avatar-dot" style="background:${COLORS[i % COLORS.length]}"></span>`;
-      const hostTag = p.id === hostId ? ' 👑' : '';
-      li.innerHTML = `<span class="p-name">${dot}${escapeHtml(p.name)}${hostTag}</span><span class="p-score">${p.score}</span>`;
+      const streakTag = p.streak >= 2 ? ` <span class="streak-tag">🔥${p.streak}</span>` : '';
+      const offlineTag = !p.connected ? ' <span class="offline-tag">(reconnecting…)</span>' : '';
+      li.innerHTML = `<span class="p-name">${dot}${escapeHtml(p.name)}${streakTag}${offlineTag}</span><span class="p-score">${p.score}</span>`;
       list.appendChild(li);
     });
   });
@@ -88,10 +139,30 @@ function escapeHtml(str) {
   return div.innerHTML;
 }
 
+// ---------- Word pack picker (host only, lobby only) ----------
+const packSelect = document.getElementById('wordpack-select');
+const customBox = document.getElementById('custom-words-box');
+packSelect.addEventListener('change', () => {
+  customBox.classList.toggle('hidden', packSelect.value !== 'custom');
+});
+document.getElementById('save-wordpack-btn').addEventListener('click', () => {
+  const pack = packSelect.value;
+  const customWords = document.getElementById('custom-words-input').value
+    .split(',').map(w => w.trim()).filter(Boolean);
+  socket.emit('set-word-pack', { pack, customWords });
+});
+socket.on('word-pack-update', ({ wordPack }) => setWordPackUI(wordPack));
+function setWordPackUI(pack) {
+  if (!pack) return;
+  packSelect.value = pack;
+  customBox.classList.toggle('hidden', pack !== 'custom');
+}
+
+// ---------- Choosing word ----------
 socket.on('choosing', ({ drawerId, drawerName, roundNumber, totalRounds, chooseSeconds }) => {
   showScreen('screen-game');
   resizeCanvas();
-  isDrawer = drawerId === myId;
+  isDrawer = drawerId === socket.id;
   document.getElementById('round-label').textContent = `${roundNumber}/${totalRounds}`;
   document.getElementById('chat-log').innerHTML = '';
   hideOverlay('roundend-overlay');
@@ -102,6 +173,7 @@ socket.on('choosing', ({ drawerId, drawerName, roundNumber, totalRounds, chooseS
     : `${drawerName} is choosing a word…`;
   document.getElementById('choose-options').innerHTML = '';
   document.getElementById('toolbar').classList.add('hidden');
+  document.getElementById('reaction-bar').classList.add('hidden');
   document.getElementById('drawer-banner').classList.add('hidden');
 
   let t = chooseSeconds;
@@ -130,26 +202,31 @@ socket.on('choose-word', ({ options }) => {
   });
 });
 
-socket.on('round-start', ({ drawerId, drawerName, maskedWord, timeLeft, roundNumber, totalRounds }) => {
+// ---------- Round start / drawing ----------
+socket.on('round-start', ({ drawerId, drawerName, maskedWord, wordLength, timeLeft, roundNumber, totalRounds }) => {
   hideOverlay('choose-overlay');
   hideOverlay('roundend-overlay');
   resizeCanvas();
-  isDrawer = drawerId === myId;
+  isDrawer = drawerId === socket.id;
+  currentWordLength = wordLength;
   document.getElementById('round-label').textContent = `${roundNumber}/${totalRounds}`;
   document.getElementById('word-display').textContent = maskedWord.split('').join(' ');
   setTimerFill(timeLeft);
 
   const banner = document.getElementById('drawer-banner');
   const toolbar = document.getElementById('toolbar');
+  const reactionBar = document.getElementById('reaction-bar');
   const canvas = document.getElementById('draw-canvas');
   if (isDrawer) {
     banner.classList.add('hidden');
     toolbar.classList.remove('hidden');
+    reactionBar.classList.add('hidden');
     canvas.style.cursor = 'crosshair';
   } else {
     banner.textContent = `${drawerName} is drawing…`;
     banner.classList.remove('hidden');
     toolbar.classList.add('hidden');
+    reactionBar.classList.remove('hidden');
     canvas.style.cursor = 'default';
   }
 });
@@ -169,15 +246,19 @@ function setTimerFill(timeLeft) {
   document.getElementById('timer-fill').style.width = pct + '%';
 }
 
+// ---------- Round end ----------
 socket.on('round-end', ({ word, players }) => {
   renderPlayerList(players);
   document.getElementById('revealed-word').textContent = word.toUpperCase();
   showOverlay('roundend-overlay');
   document.getElementById('toolbar').classList.add('hidden');
+  document.getElementById('reaction-bar').classList.add('hidden');
 });
 
-socket.on('game-end', ({ players }) => {
+// ---------- Game end ----------
+socket.on('game-end', ({ players, bestDrawer, fastestGuesser }) => {
   showScreen('screen-end');
+  localStorage.removeItem('dd_room');
   const board = document.getElementById('final-scoreboard');
   board.innerHTML = '';
   players.forEach((p, i) => {
@@ -185,15 +266,22 @@ socket.on('game-end', ({ players }) => {
     li.innerHTML = `<span><span class="rank">#${i + 1}</span>${escapeHtml(p.name)}${i === 0 ? ' 🏆' : ''}</span><span>${p.score}</span>`;
     board.appendChild(li);
   });
+  const badges = document.getElementById('end-badges');
+  badges.innerHTML = '';
+  if (bestDrawer) badges.innerHTML += `<div class="badge">🎨 Best Drawer: <b>${escapeHtml(bestDrawer)}</b></div>`;
+  if (fastestGuesser) badges.innerHTML += `<div class="badge">⚡ Fastest Guesser: <b>${escapeHtml(fastestGuesser)}</b></div>`;
+  launchConfetti();
+  playWinJingle();
 });
 
 document.getElementById('play-again-btn').addEventListener('click', () => socket.emit('play-again'));
-document.getElementById('back-home-btn').addEventListener('click', () => location.reload());
-
-socket.on('back-to-lobby', () => {
-  showScreen('screen-lobby');
+document.getElementById('back-home-btn').addEventListener('click', () => {
+  socket.emit('leave-room');
+  localStorage.removeItem('dd_room');
+  location.reload();
 });
 
+// ---------- Chat / guessing ----------
 const chatLog = document.getElementById('chat-log');
 document.getElementById('guess-form').addEventListener('submit', e => {
   e.preventDefault();
@@ -206,8 +294,13 @@ document.getElementById('guess-form').addEventListener('submit', e => {
 
 socket.on('chat-message', ({ name, text }) => addChat(`<span class="who">${escapeHtml(name)}:</span>${escapeHtml(text)}`));
 socket.on('system-message', ({ text }) => addChat(escapeHtml(text), true));
-socket.on('guess-result', ({ correct, points }) => {
-  if (correct) addChat(`🎉 You guessed it! +${points} points`, true);
+socket.on('guess-result', ({ correct, points, fastest, streak }) => {
+  if (correct) {
+    let msg = `🎉 You guessed it! +${points} points`;
+    if (fastest) msg += ' — Fastest! 🥇';
+    if (streak >= 2) msg += ` — 🔥 ${streak} streak!`;
+    addChat(msg, true);
+  }
 });
 
 function addChat(html, isSystem) {
@@ -218,15 +311,38 @@ function addChat(html, isSystem) {
   chatLog.scrollTop = chatLog.scrollHeight;
 }
 
+// ---------- Emoji reactions ----------
+const reactionBar = document.getElementById('reaction-bar');
+REACTIONS.forEach(emoji => {
+  const btn = document.createElement('button');
+  btn.className = 'reaction-btn';
+  btn.textContent = emoji;
+  btn.addEventListener('click', () => socket.emit('reaction', { emoji }));
+  reactionBar.appendChild(btn);
+});
+
+socket.on('reaction', ({ emoji }) => {
+  const paper = document.querySelector('.canvas-paper');
+  const el = document.createElement('div');
+  el.className = 'floating-emoji';
+  el.textContent = emoji;
+  el.style.left = (10 + Math.random() * 80) + '%';
+  paper.appendChild(el);
+  setTimeout(() => el.remove(), 1600);
+});
+
+// ---------- Canvas drawing ----------
 const canvas = document.getElementById('draw-canvas');
 const ctx = canvas.getContext('2d');
 
 function resizeCanvas() {
   const rect = canvas.parentElement.getBoundingClientRect();
+  if (rect.width === 0 || rect.height === 0) return;
   const imgData = canvas.width ? ctx.getImageData(0, 0, canvas.width, canvas.height) : null;
   canvas.width = rect.width;
   canvas.height = rect.height;
   if (imgData) ctx.putImageData(imgData, 0, 0);
+  else clearCanvasLocal();
 }
 window.addEventListener('resize', resizeCanvas);
 setTimeout(resizeCanvas, 50);
@@ -283,6 +399,7 @@ function clearCanvasLocal() {
   ctx.fillRect(0, 0, canvas.width, canvas.height);
 }
 
+// ---------- Toolbar ----------
 const swatchBox = document.getElementById('color-swatches');
 COLORS.forEach((c, i) => {
   const sw = document.createElement('div');
@@ -312,3 +429,38 @@ document.getElementById('clear-btn').addEventListener('click', () => {
   clearCanvasLocal();
   socket.emit('clear-canvas');
 });
+
+// ---------- Confetti + win sound (no external libraries) ----------
+function launchConfetti() {
+  const colors = ['#ff6b6b', '#ffcf4d', '#5aa9ff', '#4fd6b0', '#a86bff'];
+  for (let i = 0; i < 80; i++) {
+    const piece = document.createElement('div');
+    piece.className = 'confetti-piece';
+    piece.style.left = Math.random() * 100 + 'vw';
+    piece.style.background = colors[Math.floor(Math.random() * colors.length)];
+    piece.style.animationDuration = (2 + Math.random() * 1.5) + 's';
+    piece.style.animationDelay = (Math.random() * 0.5) + 's';
+    document.body.appendChild(piece);
+    setTimeout(() => piece.remove(), 4000);
+  }
+}
+
+let audioCtx = null;
+function playWinJingle() {
+  try {
+    if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+    const notes = [523.25, 659.25, 783.99, 1046.5];
+    notes.forEach((freq, i) => {
+      const o = audioCtx.createOscillator();
+      const g = audioCtx.createGain();
+      o.type = 'triangle';
+      o.frequency.value = freq;
+      g.gain.value = 0.12;
+      o.connect(g); g.connect(audioCtx.destination);
+      const startTime = audioCtx.currentTime + i * 0.15;
+      o.start(startTime);
+      g.gain.exponentialRampToValueAtTime(0.001, startTime + 0.4);
+      o.stop(startTime + 0.4);
+    });
+  } catch (e) {}
+}

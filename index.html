@@ -15,6 +15,7 @@
   <div class="board-frame home-card">
     <h1 class="logo">Doodle<span class="logo-accent">Duel</span></h1>
     <p class="tagline">Grab your chalk. Guess the doodle. Beat the clock.</p>
+    <p id="reconnect-msg" class="hint-text hidden">Reconnecting to your last game…</p>
 
     <div class="field">
       <label for="name-input">Your name</label>
@@ -45,8 +46,22 @@
       <ul id="lobby-player-list" class="player-list"></ul>
     </div>
 
+    <div id="wordpack-picker" class="wordpack-picker" style="display:none">
+      <label for="wordpack-select">Word pack</label>
+      <select id="wordpack-select">
+        <option value="english">English</option>
+        <option value="arabic">العربية (Arabic)</option>
+        <option value="custom">Custom words</option>
+      </select>
+      <div id="custom-words-box" class="hidden">
+        <textarea id="custom-words-input" placeholder="Type words separated by commas: cat, pizza, moon…"></textarea>
+        <button id="save-wordpack-btn" class="btn btn-secondary btn-small">Save word pack</button>
+      </div>
+    </div>
+
     <button id="start-game-btn" class="btn btn-primary">Start Game</button>
     <p id="lobby-hint" class="hint-text">Waiting for the host to start the game…</p>
+    <button id="leave-room-btn" class="btn btn-text">Leave room</button>
   </div>
 </section>
 
@@ -87,6 +102,7 @@
           <button class="tool-btn" id="clear-btn" title="Clear canvas">🗑</button>
         </div>
       </div>
+      <div id="reaction-bar" class="reaction-bar hidden"></div>
     </div>
 
     <div class="chatbox">
@@ -113,6 +129,7 @@
   <div class="board-frame end-card">
     <h2 class="eyebrow">Final Scores</h2>
     <ol id="final-scoreboard" class="scoreboard"></ol>
+    <div id="end-badges" class="end-badges"></div>
     <button id="play-again-btn" class="btn btn-primary">Play Again</button>
     <button id="back-home-btn" class="btn btn-secondary">Back to Home</button>
   </div>

@@ -232,3 +232,52 @@ html, body {
   .canvas-wrap { order: 1; }
   .chatbox { order: 3; min-height: 200px; }
 }
+
+/* ---------- New feature styles ---------- */
+.btn-text {
+  background: none; box-shadow: none; color: #b3aa8c; font-size: 12px; font-weight: 600;
+  padding: 6px; margin-top: 4px; text-decoration: underline;
+}
+.streak-tag { color: #ff9f4d; font-weight: 800; }
+.offline-tag { color: #b3aa8c; font-size: 11px; font-style: italic; }
+.player-list li.disconnected { opacity: 0.55; }
+
+.wordpack-picker { text-align: left; margin-bottom: 14px; background: #fffdf7; border: 2px solid #efe4b0; border-radius: 10px; padding: 10px 12px; }
+.wordpack-picker label { display: block; font-size: 12px; font-weight: 700; color: #6b6555; margin-bottom: 6px; }
+.wordpack-picker select {
+  width: 100%; padding: 9px 10px; border-radius: 8px; border: 2px solid #e3d8b8; background: #fff; font-size: 14px; margin-bottom: 8px;
+}
+.wordpack-picker textarea {
+  width: 100%; min-height: 60px; border-radius: 8px; border: 2px solid #e3d8b8; padding: 8px; font-size: 13px; margin-bottom: 8px; resize: vertical;
+}
+
+.reaction-bar {
+  display: flex; gap: 6px; justify-content: center; background: #16302b; border-radius: 12px; padding: 8px;
+}
+.reaction-bar.hidden { display: none; }
+.reaction-btn {
+  background: rgba(244,240,228,0.1); border: none; border-radius: 8px; font-size: 18px; padding: 6px 10px; cursor: pointer;
+  transition: transform 0.1s ease;
+}
+.reaction-btn:active { transform: scale(1.3); }
+
+.floating-emoji {
+  position: absolute; bottom: 10px; font-size: 28px; pointer-events: none;
+  animation: floatUp 1.6s ease-out forwards;
+}
+@keyframes floatUp {
+  0% { transform: translateY(0) scale(0.8); opacity: 1; }
+  100% { transform: translateY(-160px) scale(1.3); opacity: 0; }
+}
+
+.end-badges { display: flex; flex-direction: column; gap: 8px; margin-bottom: 16px; }
+.badge { background: #fff8e0; border: 2px solid #ffcf4d; border-radius: 10px; padding: 8px 12px; font-size: 14px; font-weight: 700; color: #6b5200; }
+
+.confetti-piece {
+  position: fixed; top: -20px; width: 10px; height: 16px; z-index: 100;
+  animation-name: confettiFall; animation-timing-function: ease-in; animation-fill-mode: forwards;
+}
+@keyframes confettiFall {
+  0% { transform: translateY(0) rotate(0deg); opacity: 1; }
+  100% { transform: translateY(100vh) rotate(540deg); opacity: 0.4; }
+}
