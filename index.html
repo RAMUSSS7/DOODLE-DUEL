@@ -9,12 +9,14 @@
 <body>
 
 <div class="chalk-dust"></div>
+<button id="theme-toggle" class="theme-toggle-btn" title="Toggle theme">🌓</button>
 
 <!-- HOME SCREEN -->
 <section id="screen-home" class="screen active">
   <div class="board-frame home-card">
     <h1 class="logo">Doodle<span class="logo-accent">Duel</span></h1>
     <p class="tagline">Grab your chalk. Guess the doodle. Beat the clock.</p>
+    <p id="level-badge" class="level-badge">Lv.1 • 0 XP</p>
     <p id="reconnect-msg" class="hint-text hidden">Reconnecting to your last game…</p>
 
     <div class="field">
@@ -22,7 +24,12 @@
       <input id="name-input" maxlength="16" placeholder="e.g. Amine" autocomplete="off">
     </div>
 
+    <label class="checkbox-row">
+      <input type="checkbox" id="public-room-checkbox"> Make this room public (anyone can find & join)
+    </label>
+
     <button id="create-room-btn" class="btn btn-primary">Create a Room</button>
+    <button id="browse-rooms-btn" class="btn btn-text">🔎 Browse public rooms</button>
 
     <div class="divider"><span>or join one</span></div>
 
@@ -35,10 +42,19 @@
   </div>
 </section>
 
+<!-- BROWSE PUBLIC ROOMS OVERLAY -->
+<div id="browse-overlay" class="overlay hidden">
+  <div class="board-frame browse-card">
+    <p class="eyebrow">Public rooms</p>
+    <div id="public-rooms-list" class="public-rooms-list"></div>
+    <button id="browse-close-btn" class="btn btn-secondary">Close</button>
+  </div>
+</div>
+
 <!-- LOBBY SCREEN -->
 <section id="screen-lobby" class="screen">
   <div class="board-frame lobby-card">
-    <p class="eyebrow">Room code — share it with friends</p>
+    <p class="eyebrow">Room code — share it with friends <span id="public-room-lobby-tag" class="public-tag hidden">🌍 Public</span></p>
     <div class="room-code-display" id="room-code-display">-----</div>
 
     <div class="lobby-players">
@@ -57,6 +73,9 @@
         <textarea id="custom-words-input" placeholder="Type words separated by commas: cat, pizza, moon…"></textarea>
         <button id="save-wordpack-btn" class="btn btn-secondary btn-small">Save word pack</button>
       </div>
+      <div id="team-mode-row" class="checkbox-row team-mode-row">
+        <label><input type="checkbox" id="team-mode-checkbox"> Team Mode (2 teams)</label>
+      </div>
     </div>
 
     <button id="start-game-btn" class="btn btn-primary">Start Game</button>
@@ -65,7 +84,7 @@
   </div>
 </section>
 
-<!-- CHOOSING WORD OVERLAY (shown on top of game screen) -->
+<!-- CHOOSING WORD OVERLAY -->
 <div id="choose-overlay" class="overlay hidden">
   <div class="board-frame choose-card">
     <p class="eyebrow" id="choose-heading">Pick a word to draw</p>
@@ -81,6 +100,7 @@
     <div class="timer-track"><div id="timer-fill" class="timer-fill"></div></div>
     <div class="topbar-item word-display" id="word-display">_ _ _ _</div>
   </div>
+  <div id="team-score-bar" class="team-score-bar hidden"></div>
 
   <div class="game-main">
     <aside class="sidebar">
@@ -96,9 +116,15 @@
       <div id="toolbar" class="toolbar hidden">
         <div class="colors" id="color-swatches"></div>
         <div class="tool-group">
+          <button class="tool-btn tool-select active" id="tool-pen" title="Pen">✏️</button>
+          <button class="tool-btn tool-select" id="tool-line" title="Line">╱</button>
+          <button class="tool-btn tool-select" id="tool-rect" title="Rectangle">▭</button>
+          <button class="tool-btn tool-select" id="tool-circle" title="Circle">◯</button>
+          <button class="tool-btn tool-select" id="tool-fill" title="Fill bucket">🪣</button>
           <button class="tool-btn" id="brush-small" title="Thin">●</button>
           <button class="tool-btn" id="brush-large" title="Thick">⬤</button>
           <button class="tool-btn" id="eraser-btn" title="Eraser">🧽</button>
+          <button class="tool-btn" id="undo-btn" title="Undo">↩️</button>
           <button class="tool-btn" id="clear-btn" title="Clear canvas">🗑</button>
         </div>
       </div>
@@ -107,6 +133,7 @@
 
     <div class="chatbox">
       <div id="chat-log" class="chat-log"></div>
+      <div id="typing-indicator" class="typing-indicator"></div>
       <form id="guess-form" class="guess-form">
         <input id="guess-input" placeholder="Type your guess…" autocomplete="off">
         <button type="submit" class="btn btn-primary btn-small">Send</button>
