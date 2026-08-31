@@ -407,3 +407,37 @@ body.theme-light .game-topbar, body.theme-light .sidebar, body.theme-light .chat
 .solo-bot-canvas.hidden { display: none; }
 #solo-bot-canvas { width: 100%; height: 100%; display: block; }
 .solo-bot-panel h3 { margin-bottom: 8px; }
+
+/* ---------- Broader mobile pass (phones) ---------- */
+@media (max-width: 480px) {
+  .board-frame { padding: 22px 18px; }
+  .logo { font-size: 26px; }
+  .tagline { font-size: 12px; }
+  .room-code-display { font-size: 30px; letter-spacing: 6px; }
+
+  .field-row { flex-wrap: wrap; }
+  .field-row input { width: 100%; }
+  .field-row button { width: 100%; }
+
+  .game-topbar {
+    flex-wrap: wrap; gap: 6px; padding: 8px 10px; row-gap: 6px;
+  }
+  .game-topbar .timer-track { order: 3; flex-basis: 100%; }
+  .topbar-item { font-size: 12px; }
+  .word-display { font-size: 15px; letter-spacing: 2px; }
+
+  .difficulty-options { gap: 6px; }
+  .radio-pill { font-size: 11px; padding: 5px 9px; }
+
+  .canvas-paper { min-height: 260px; }
+  .solo-rush-word { font-size: 20px; letter-spacing: 2px; }
+
+  .public-room-row { flex-wrap: wrap; gap: 8px; align-items: flex-start; }
+  .public-room-row button { width: 100%; }
+
+  .menu-drawer { padding: 14px; width: 260px; }
+  .choose-options button { font-size: 15px; padding: 12px; }
+
+  .end-badges .badge { font-size: 12px; }
+  .scoreboard li { font-size: 13px; padding: 8px 12px; }
+}

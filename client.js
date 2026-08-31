@@ -529,7 +529,6 @@ function resizeCanvas() {
 window.addEventListener('resize', resizeCanvas);
 window.addEventListener('resize', () => {
   if (soloPracticeEditor && document.getElementById('screen-solo-practice').classList.contains('active')) soloPracticeEditor.resize();
-  if (soloBdEditor && document.getElementById('screen-solo-botdrawer').classList.contains('active')) soloBdEditor.resize();
 });
 setTimeout(resizeCanvas, 50);
 
@@ -791,12 +790,8 @@ document.getElementById('solo-hub-back-btn').addEventListener('click', () => sho
 
 document.querySelectorAll('.solo-mode-btn').forEach(btn => {
   btn.addEventListener('click', () => {
-    const mode = btn.dataset.mode;
     const { pack, diff } = currentSoloPackDiff();
-    if (mode === 'practice') startSoloPractice(pack, diff);
-    else if (mode === 'rush') startSoloRush(pack, diff, false);
-    else if (mode === 'bot-guesses') startSoloRush(pack, diff, true);
-    else if (mode === 'bot-drawer') startSoloBotDrawer(pack, diff);
+    startSoloPractice(pack, diff);
   });
 });
 
@@ -992,169 +987,5 @@ document.getElementById('solo-practice-next-btn').addEventListener('click', () =
 });
 document.getElementById('solo-practice-exit-btn').addEventListener('click', () => {
   clearInterval(soloPracticeTimer);
-  showScreen('screen-solo-hub');
-});
-
-// ---------- 🅱️ Guess Rush & 🅲 Bot Draws, You Guess (shared mechanic) ----------
-let soloRushWord = null, soloRushTimer = null, soloRushScore = 0, soloRushStreak = 0;
-let soloRushMaskedWord = '', soloRushHintsSent = 0, soloRushTimeLeft = 0, soloRushTotal = 45;
-let soloRushIsBotVisual = false, soloBotAnimTimer = null;
-
-function startSoloRush(pack, diff, botVisual) {
-  soloRushIsBotVisual = botVisual;
-  document.getElementById('solo-rush-title').textContent = botVisual ? '🅲 Bot Draws, You Guess' : '🅱️ Guess Rush';
-  document.getElementById('solo-bot-canvas-wrap').classList.toggle('hidden', !botVisual);
-  soloRushScore = 0; soloRushStreak = 0;
-  document.getElementById('solo-rush-score').textContent = soloRushScore;
-  document.getElementById('solo-rush-streak').textContent = soloRushStreak;
-  const bestKey = botVisual ? 'dd_solo_bot_best' : 'dd_solo_rush_best';
-  document.getElementById('solo-rush-best').textContent = localStorage.getItem(bestKey) || 0;
-  showScreen('screen-solo-rush');
-  nextSoloRushWord(pack, diff);
-}
-function nextSoloRushWord(pack, diff) {
-  soloRushWord = pickSoloWord(pack, diff);
-  soloRushMaskedWord = soloRushWord.word.split('').map(c => (c === ' ' ? ' ' : '_')).join('');
-  soloRushHintsSent = 0;
-  soloRushTotal = soloRushWord.difficulty === 'hard' ? 70 : soloRushWord.difficulty === 'easy' ? 40 : 55;
-  soloRushTimeLeft = soloRushTotal;
-  document.getElementById('solo-rush-word').textContent = soloRushMaskedWord.split('').join(' ');
-  document.getElementById('solo-rush-feedback').textContent = '';
-  document.getElementById('solo-rush-input').value = '';
-  clearInterval(soloRushTimer);
-  document.getElementById('solo-rush-timer-fill').style.width = '100%';
-  if (soloRushIsBotVisual) startBotScribble();
-  soloRushTimer = setInterval(() => {
-    soloRushTimeLeft--;
-    document.getElementById('solo-rush-timer-fill').style.width = Math.max(0, Math.min(100, (soloRushTimeLeft / soloRushTotal) * 100)) + '%';
-    const frac = soloRushTimeLeft / soloRushTotal;
-    const fractions = [0.6, 0.35, 0.15];
-    if (soloRushHintsSent < fractions.length && frac <= fractions[soloRushHintsSent]) { soloRushHintsSent++; revealSoloHint(); }
-    if (soloRushTimeLeft <= 0) {
-      clearInterval(soloRushTimer); stopBotScribble();
-      soloRushStreak = 0;
-      document.getElementById('solo-rush-streak').textContent = soloRushStreak;
-      document.getElementById('solo-rush-feedback').textContent = `⏰ Time's up! The word was ${soloRushWord.word.toUpperCase()}`;
-      setTimeout(() => nextSoloRushWord(pack, diff), 1800);
-    }
-  }, 1000);
-}
-function revealSoloHint() {
-  const chars = soloRushMaskedWord.split('');
-  const hidden = [];
-  for (let i = 0; i < chars.length; i++) if (chars[i] === '_') hidden.push(i);
-  if (!hidden.length) return;
-  const idx = hidden[Math.floor(Math.random() * hidden.length)];
-  chars[idx] = soloRushWord.word[idx];
-  soloRushMaskedWord = chars.join('');
-  document.getElementById('solo-rush-word').textContent = soloRushMaskedWord.split('').join(' ');
-}
-document.getElementById('solo-rush-form').addEventListener('submit', e => {
-  e.preventDefault();
-  const input = document.getElementById('solo-rush-input');
-  const text = input.value.trim().toLowerCase();
-  input.value = '';
-  if (!soloRushWord) return;
-  const { pack, diff } = currentSoloPackDiff();
-  if (text === soloRushWord.word.toLowerCase()) {
-    clearInterval(soloRushTimer); stopBotScribble();
-    const mult = { easy: 1, medium: 1.25, hard: 1.5 }[soloRushWord.difficulty] || 1;
-    const base = Math.max(10, Math.round(100 * (soloRushTimeLeft / soloRushTotal)));
-    soloRushStreak++;
-    const streakBonus = soloRushStreak >= 2 ? Math.min(soloRushStreak * 5, 25) : 0;
-    const points = Math.round(base * mult) + streakBonus;
-    soloRushScore += points;
-    document.getElementById('solo-rush-score').textContent = soloRushScore;
-    document.getElementById('solo-rush-streak').textContent = soloRushStreak;
-    document.getElementById('solo-rush-feedback').textContent = `🎉 Correct! +${points}${soloRushStreak >= 2 ? ' (🔥 streak ' + soloRushStreak + ')' : ''}`;
-    const bestKey = soloRushIsBotVisual ? 'dd_solo_bot_best' : 'dd_solo_rush_best';
-    const best = parseInt(localStorage.getItem(bestKey) || '0', 10);
-    if (soloRushScore > best) { localStorage.setItem(bestKey, soloRushScore); document.getElementById('solo-rush-best').textContent = soloRushScore; }
-    if (soloRushStreak >= 3) unlockAchievement('streak3', 'On Fire (3 streak)');
-    setTimeout(() => nextSoloRushWord(pack, diff), 1200);
-  } else {
-    document.getElementById('solo-rush-feedback').textContent = `❌ "${escapeHtml(text)}" isn't it — keep trying!`;
-  }
-});
-document.getElementById('solo-rush-exit-btn').addEventListener('click', () => {
-  clearInterval(soloRushTimer); stopBotScribble();
-  showScreen('screen-solo-hub');
-});
-
-function startBotScribble() {
-  clearInterval(soloBotAnimTimer);
-  setTimeout(() => {
-    const canvas = document.getElementById('solo-bot-canvas');
-    const ctx = canvas.getContext('2d');
-    const rect = canvas.parentElement.getBoundingClientRect();
-    if (rect.width === 0 || rect.height === 0) return;
-    canvas.width = rect.width; canvas.height = rect.height;
-    ctx.fillStyle = '#faf3e2'; ctx.fillRect(0, 0, canvas.width, canvas.height);
-    let last = null;
-    soloBotAnimTimer = setInterval(() => {
-      const p = { x: Math.random() * canvas.width, y: Math.random() * canvas.height };
-      if (last) {
-        ctx.strokeStyle = '#2c2a24'; ctx.lineWidth = 3; ctx.lineCap = 'round';
-        ctx.beginPath(); ctx.moveTo(last.x, last.y); ctx.lineTo(p.x, p.y); ctx.stroke();
-      }
-      last = p;
-    }, 220);
-  }, 60);
-}
-function stopBotScribble() { clearInterval(soloBotAnimTimer); }
-
-// ---------- 🅲 You Draw, Bot Guesses ----------
-let soloBdEditor = null, soloBdWord = null, soloBdTimer = null, soloBdTimeLeft = 0, soloBdTotal = 60, soloBdGuessScheduled = false;
-
-function startSoloBotDrawer(pack, diff) {
-  soloBdWord = pickSoloWord(pack, diff);
-  document.getElementById('solo-bd-word').textContent = `Draw: ${soloBdWord.word.toUpperCase()} (${soloBdWord.difficulty})`;
-  document.getElementById('solo-bd-bot-status').textContent = '🤖 Watching you draw…';
-  showScreen('screen-solo-botdrawer');
-  if (!soloBdEditor) {
-    soloBdEditor = setupDrawingCanvas({
-      canvasId: 'solo-bd-canvas', swatchContainerId: 'solo-bd-swatches',
-      toolButtonSelector: '#solo-bd-toolbar [data-solobd-tool]', toolDataKey: 'solobdTool',
-      brushSmallId: 'solo-bd-brush-small', brushLargeId: 'solo-bd-brush-large',
-      eraserBtnId: 'solo-bd-eraser-btn', undoBtnId: 'solo-bd-undo-btn', clearBtnId: 'solo-bd-clear-btn'
-    });
-  }
-  soloBdEditor.state.history = [];
-  setTimeout(() => { soloBdEditor.resize(); }, 50);
-  soloBdTotal = soloBdWord.difficulty === 'hard' ? 75 : soloBdWord.difficulty === 'easy' ? 45 : 60;
-  soloBdTimeLeft = soloBdTotal;
-  document.getElementById('solo-bd-timer-fill').style.width = '100%';
-  soloBdGuessScheduled = false;
-  clearInterval(soloBdTimer);
-  soloBdTimer = setInterval(() => {
-    soloBdTimeLeft--;
-    document.getElementById('solo-bd-timer-fill').style.width = Math.max(0, Math.min(100, (soloBdTimeLeft / soloBdTotal) * 100)) + '%';
-    maybeBotGuess();
-    if (soloBdTimeLeft <= 0) {
-      clearInterval(soloBdTimer);
-      if (!soloBdGuessScheduled) document.getElementById('solo-bd-bot-status').textContent = `🤖 I give up! Was it "${soloBdWord.word}"?`;
-    }
-  }, 1000);
-}
-function maybeBotGuess() {
-  if (soloBdGuessScheduled || !soloBdEditor) return;
-  const elapsedFrac = 1 - (soloBdTimeLeft / soloBdTotal);
-  const strokes = soloBdEditor.state.history.length;
-  const chance = Math.min(0.9, elapsedFrac * 0.6 + Math.min(strokes / 40, 1) * 0.4);
-  if (Math.random() < chance * 0.25) {
-    soloBdGuessScheduled = true;
-    document.getElementById('solo-bd-bot-status').textContent = '🤖 Thinking…';
-    setTimeout(() => {
-      document.getElementById('solo-bd-bot-status').innerHTML = `🤖 I think it's… <b>${soloBdWord.word.toUpperCase()}</b>! 🎉`;
-    }, 900);
-  }
-}
-document.getElementById('solo-bd-next-btn').addEventListener('click', () => {
-  clearInterval(soloBdTimer);
-  const { pack, diff } = currentSoloPackDiff();
-  startSoloBotDrawer(pack, diff);
-});
-document.getElementById('solo-bd-exit-btn').addEventListener('click', () => {
-  clearInterval(soloBdTimer);
   showScreen('screen-solo-hub');
 });

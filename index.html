@@ -152,11 +152,8 @@
       </div>
     </div>
 
-    <button class="btn btn-primary solo-mode-btn" data-mode="practice">🅰️ Draw Practice — sketch freely, no pressure</button>
-    <button class="btn btn-primary solo-mode-btn" data-mode="rush">🅱️ Guess Rush — race the clock with hints</button>
-    <button class="btn btn-primary solo-mode-btn" data-mode="bot-guesses">🅲 Bot Draws, You Guess</button>
-    <button class="btn btn-primary solo-mode-btn" data-mode="bot-drawer">🅲 You Draw, Bot Guesses</button>
-    <p class="hint-text">🤖 Heads up: the bot doesn't actually "see" your drawing — it reacts to time and how much you've drawn, just for a fun practice feel.</p>
+    <button class="btn btn-primary solo-mode-btn" data-mode="practice">🎨 Start Drawing</button>
+    <p class="hint-text">Pick a word pack and difficulty, then sketch freely — no timer pressure, no one guessing.</p>
 
     <button id="solo-hub-back-btn" class="btn btn-text">← Back</button>
   </div>
@@ -196,68 +193,6 @@
     <button id="solo-practice-download-btn" class="btn btn-secondary btn-small">⬇ Download drawing</button>
     <button id="solo-practice-next-btn" class="btn btn-primary btn-small">Next word</button>
     <button id="solo-practice-exit-btn" class="btn btn-text">← Exit</button>
-  </div>
-</section>
-
-<!-- SOLO: GUESS RUSH / BOT DRAWS -->
-<section id="screen-solo-rush" class="screen">
-  <div class="board-frame solo-rush-card">
-    <p class="eyebrow" id="solo-rush-title">🅱️ Guess Rush</p>
-    <div class="game-topbar solo-rush-topbar">
-      <div class="topbar-item">Score <span id="solo-rush-score">0</span></div>
-      <div class="timer-track"><div id="solo-rush-timer-fill" class="timer-fill"></div></div>
-      <div class="topbar-item">🔥 <span id="solo-rush-streak">0</span></div>
-    </div>
-    <div id="solo-bot-canvas-wrap" class="canvas-paper solo-bot-canvas hidden">
-      <canvas id="solo-bot-canvas"></canvas>
-    </div>
-    <div class="word-display solo-rush-word" id="solo-rush-word">_ _ _ _</div>
-    <form id="solo-rush-form" class="guess-form">
-      <input id="solo-rush-input" placeholder="Type your guess…" autocomplete="off">
-      <button type="submit" class="btn btn-primary btn-small">Guess</button>
-    </form>
-    <p id="solo-rush-feedback" class="hint-text"></p>
-    <p class="hint-text">Best score: <b id="solo-rush-best">0</b></p>
-    <button id="solo-rush-exit-btn" class="btn btn-text">← Exit</button>
-  </div>
-</section>
-
-<!-- SOLO: YOU DRAW, BOT GUESSES -->
-<section id="screen-solo-botdrawer" class="screen">
-  <div class="game-topbar">
-    <div class="topbar-item">🅲 You Draw, Bot Guesses</div>
-    <div class="timer-track"><div id="solo-bd-timer-fill" class="timer-fill"></div></div>
-    <div class="topbar-item word-display" id="solo-bd-word">draw: ?????</div>
-  </div>
-  <div class="game-main solo-main">
-    <aside class="sidebar solo-bot-panel">
-      <h3>🤖 Bot</h3>
-      <p id="solo-bd-bot-status" class="hint-text">Watching you draw…</p>
-    </aside>
-    <div class="canvas-wrap">
-      <div class="canvas-paper">
-        <canvas id="solo-bd-canvas"></canvas>
-      </div>
-      <div class="toolbar" id="solo-bd-toolbar">
-        <div class="colors" id="solo-bd-swatches"></div>
-        <div class="tool-group">
-          <button class="tool-btn tool-select active" data-solobd-tool="pen" title="Pen">✏️</button>
-          <button class="tool-btn tool-select" data-solobd-tool="line" title="Line">╱</button>
-          <button class="tool-btn tool-select" data-solobd-tool="rect" title="Rectangle">▭</button>
-          <button class="tool-btn tool-select" data-solobd-tool="circle" title="Circle">◯</button>
-          <button class="tool-btn tool-select" data-solobd-tool="fill" title="Fill bucket">🪣</button>
-          <button class="tool-btn" id="solo-bd-brush-small" title="Thin">●</button>
-          <button class="tool-btn" id="solo-bd-brush-large" title="Thick">⬤</button>
-          <button class="tool-btn" id="solo-bd-eraser-btn" title="Eraser">🧽</button>
-          <button class="tool-btn" id="solo-bd-undo-btn" title="Undo">↩️</button>
-          <button class="tool-btn" id="solo-bd-clear-btn" title="Clear canvas">🗑</button>
-        </div>
-      </div>
-    </div>
-  </div>
-  <div class="solo-action-row">
-    <button id="solo-bd-next-btn" class="btn btn-primary btn-small">Next word</button>
-    <button id="solo-bd-exit-btn" class="btn btn-text">← Exit</button>
   </div>
 </section>
 

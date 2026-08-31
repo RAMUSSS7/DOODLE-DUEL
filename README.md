@@ -36,10 +36,9 @@ that way both locally and in your GitHub repo, or the server won't find them.
 - A slide-out menu with Settings, My Stats (level/XP + achievements),
   How to Play, and About
 - Confetti + a little win jingle on the final results screen
-- **Solo Play** (no room needed): Draw Practice, Guess Rush (race the clock),
-  and a Bot Duel mode in both directions (bot draws & you guess, or you draw
-  & the bot "guesses" using a time/effort heuristic — it doesn't actually see
-  your drawing, it's just for a fun practice feel)
+- **Solo Play** (no room needed): Draw Practice — pick a word pack and
+  difficulty, sketch freely with the pen/shapes/fill/undo tools, no timer
+  pressure, no one guessing. Reveal the word or download your doodle anytime.
 
 ## Run it locally
 ```bash
