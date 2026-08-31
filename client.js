@@ -527,6 +527,10 @@ function resizeCanvas() {
   strokeHistory.forEach(renderEntry);
 }
 window.addEventListener('resize', resizeCanvas);
+window.addEventListener('resize', () => {
+  if (soloPracticeEditor && document.getElementById('screen-solo-practice').classList.contains('active')) soloPracticeEditor.resize();
+  if (soloBdEditor && document.getElementById('screen-solo-botdrawer').classList.contains('active')) soloBdEditor.resize();
+});
 setTimeout(resizeCanvas, 50);
 
 function getPos(e) {
@@ -1078,21 +1082,24 @@ document.getElementById('solo-rush-exit-btn').addEventListener('click', () => {
 });
 
 function startBotScribble() {
-  const canvas = document.getElementById('solo-bot-canvas');
-  const ctx = canvas.getContext('2d');
-  const rect = canvas.parentElement.getBoundingClientRect();
-  canvas.width = rect.width; canvas.height = rect.height;
-  ctx.fillStyle = '#faf3e2'; ctx.fillRect(0, 0, canvas.width, canvas.height);
-  let last = null;
   clearInterval(soloBotAnimTimer);
-  soloBotAnimTimer = setInterval(() => {
-    const p = { x: Math.random() * canvas.width, y: Math.random() * canvas.height };
-    if (last) {
-      ctx.strokeStyle = '#2c2a24'; ctx.lineWidth = 3; ctx.lineCap = 'round';
-      ctx.beginPath(); ctx.moveTo(last.x, last.y); ctx.lineTo(p.x, p.y); ctx.stroke();
-    }
-    last = p;
-  }, 220);
+  setTimeout(() => {
+    const canvas = document.getElementById('solo-bot-canvas');
+    const ctx = canvas.getContext('2d');
+    const rect = canvas.parentElement.getBoundingClientRect();
+    if (rect.width === 0 || rect.height === 0) return;
+    canvas.width = rect.width; canvas.height = rect.height;
+    ctx.fillStyle = '#faf3e2'; ctx.fillRect(0, 0, canvas.width, canvas.height);
+    let last = null;
+    soloBotAnimTimer = setInterval(() => {
+      const p = { x: Math.random() * canvas.width, y: Math.random() * canvas.height };
+      if (last) {
+        ctx.strokeStyle = '#2c2a24'; ctx.lineWidth = 3; ctx.lineCap = 'round';
+        ctx.beginPath(); ctx.moveTo(last.x, last.y); ctx.lineTo(p.x, p.y); ctx.stroke();
+      }
+      last = p;
+    }, 220);
+  }, 60);
 }
 function stopBotScribble() { clearInterval(soloBotAnimTimer); }
 
