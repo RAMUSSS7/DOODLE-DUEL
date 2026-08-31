@@ -19,16 +19,27 @@ that way both locally and in your GitHub repo, or the server won't find them.
 
 ## Features
 - Rooms with a 5-letter code, 2–8 players
-- Word packs: **English**, **Arabic (العربية)**, or a **custom list** the
-  host types in before starting
+- Pre-room settings screen: host picks word pack, difficulty, speed round, and
+  team mode **before** the room is even created
+- Word packs: **English**, **Arabic (العربية)**, or a **custom list**
+- Word difficulty (easy / medium / hard / mixed) affects scoring
 - No word repeats within the same game
 - Progressive letter hints as the timer runs down
 - 🥇 Fastest-guesser bonus + 🔥 guess streak bonus (both shown live)
+- Drawing tools: pen, line, rectangle, circle, fill bucket, undo
 - Emoji reactions guessers can throw while someone draws
+- Team Mode (2 teams) and an optional bonus Speed Round (2x points)
+- Public/private rooms with a "browse public rooms" list
+- Typing indicator, dark/light theme, sound & animation toggles
 - Automatic reconnect: if a player's connection drops, they keep their seat,
   score, and streak for 2 minutes and resume exactly where the game left off
+- A slide-out menu with Settings, My Stats (level/XP + achievements),
+  How to Play, and About
 - Confetti + a little win jingle on the final results screen
-- End-game badges: Best Drawer and Fastest Guesser
+- **Solo Play** (no room needed): Draw Practice, Guess Rush (race the clock),
+  and a Bot Duel mode in both directions (bot draws & you guess, or you draw
+  & the bot "guesses" using a time/effort heuristic — it doesn't actually see
+  your drawing, it's just for a fun practice feel)
 
 ## Run it locally
 ```bash

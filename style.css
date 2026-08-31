@@ -283,14 +283,59 @@ html, body {
 }
 
 /* ---------- Theme toggle & light theme ---------- */
-.theme-toggle-btn {
-  position: fixed; top: 12px; right: 12px; z-index: 40;
-  background: rgba(244,240,228,0.15); border: 2px solid rgba(244,240,228,0.3); border-radius: 50%;
-  width: 40px; height: 40px; font-size: 18px; cursor: pointer;
+.menu-toggle-btn {
+  position: fixed; top: 12px; left: 12px; z-index: 40;
+  background: rgba(244,240,228,0.15); border: 2px solid rgba(244,240,228,0.3); border-radius: 20px;
+  padding: 8px 14px; font-size: 13px; font-weight: 800; color: #f4f0e4; cursor: pointer;
 }
+
+.menu-backdrop {
+  position: fixed; inset: 0; background: rgba(10,20,18,0.55); z-index: 55;
+}
+.menu-backdrop.hidden { display: none; }
+
+.menu-drawer {
+  position: fixed; top: 0; left: 0; height: 100vh; width: 280px; max-width: 82vw;
+  background: #16302b; z-index: 60; padding: 18px; overflow-y: auto;
+  transform: translateX(-100%); transition: transform 0.3s ease;
+  box-shadow: 8px 0 24px rgba(0,0,0,0.4);
+}
+.menu-drawer.open { transform: translateX(0); }
+
+.menu-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 18px; }
+.menu-title { font-weight: 900; font-size: 18px; color: #f4f0e4; }
+.menu-close-btn { background: none; border: none; color: #f4f0e4; font-size: 18px; cursor: pointer; }
+
+.menu-item {
+  display: block; width: 100%; text-align: left; background: rgba(244,240,228,0.08); border: none;
+  color: #f4f0e4; font-size: 14px; font-weight: 700; padding: 12px 14px; border-radius: 10px;
+  margin-bottom: 8px; cursor: pointer;
+}
+.menu-item:hover { background: rgba(244,240,228,0.16); }
+.menu-item-danger { color: #ff6b6b; }
+
+.menu-view.hidden { display: none; }
+.menu-view h3 { color: #ffcf4d; margin: 10px 0 14px 0; font-size: 15px; }
+.menu-back-btn { background: none; border: none; color: #a9c9c0; font-size: 13px; font-weight: 700; cursor: pointer; padding: 0; }
+.menu-view .checkbox-row { color: #f4f0e4; }
+.theme-switch-row { display: flex; align-items: center; justify-content: space-between; margin-top: 10px; color: #f4f0e4; font-size: 13px; }
+
+.achievements-grid { display: flex; flex-direction: column; gap: 8px; margin-top: 10px; }
+.achievement-item {
+  display: flex; align-items: center; gap: 10px; background: rgba(244,240,228,0.06); border-radius: 10px; padding: 10px;
+  font-size: 12px; color: #a9c9c0;
+}
+.achievement-item.unlocked { background: rgba(255,207,77,0.15); color: #f4f0e4; }
+.achievement-item .ach-icon { font-size: 20px; filter: grayscale(1); opacity: 0.5; }
+.achievement-item.unlocked .ach-icon { filter: none; opacity: 1; }
+
+.howto-list { padding-left: 18px; margin: 0; color: #f4f0e4; font-size: 13px; line-height: 1.6; }
+.howto-list li { margin-bottom: 8px; }
+
 body.theme-light { background: radial-gradient(circle at 30% 0%, #eef3f1 0%, #dfe9e5 45%, #cfe0d9 100%); color: #1f3d38; }
 body.theme-light .board-frame { background: #ffffff; }
 body.theme-light .game-topbar, body.theme-light .sidebar, body.theme-light .chatbox, body.theme-light .toolbar, body.theme-light .reaction-bar {
+
   background: #2a4a44;
 }
 
@@ -347,3 +392,16 @@ body.theme-light .game-topbar, body.theme-light .sidebar, body.theme-light .chat
 .radio-pill input { margin: 0; }
 .radio-pill:has(input:checked) { border-color: #ffcf4d; background: #fff8e0; }
 .settings-summary { font-size: 12px; color: #8a836c; text-align: center; margin: -6px 0 14px 0; }
+
+/* ---------- Solo Play ---------- */
+.solo-main { grid-template-columns: 1fr !important; }
+.solo-action-row {
+  display: flex; flex-wrap: wrap; gap: 8px; justify-content: center; max-width: 1100px; margin: 10px auto 0 auto;
+}
+.solo-rush-card { text-align: center; max-width: 460px; }
+.solo-rush-topbar { max-width: 100%; margin-bottom: 14px; }
+.solo-rush-word { font-size: 26px; margin: 16px 0; letter-spacing: 4px; color: #2c2a24; }
+.solo-bot-canvas { height: 220px; margin-bottom: 14px; }
+.solo-bot-canvas.hidden { display: none; }
+#solo-bot-canvas { width: 100%; height: 100%; display: block; }
+.solo-bot-panel h3 { margin-bottom: 8px; }

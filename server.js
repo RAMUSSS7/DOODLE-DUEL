@@ -12,6 +12,9 @@ const io = new Server(server, {
 });
 
 app.use(express.static(__dirname));
+app.get('/api/words', (req, res) => {
+  res.json(WORD_PACKS);
+});
 
 const PORT = process.env.PORT || 3000;
 const ROUND_SECONDS = 80;

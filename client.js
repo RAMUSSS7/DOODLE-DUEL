@@ -27,9 +27,61 @@ const REACTIONS = ['😂', '🔥', '👏', '😮', '❤️', '🤔'];
 // ---------- Theme ----------
 const savedTheme = localStorage.getItem('dd_theme') || 'dark';
 if (savedTheme === 'light') document.body.classList.add('theme-light');
-document.getElementById('theme-toggle').addEventListener('click', () => {
+document.getElementById('theme-toggle-inline').addEventListener('click', () => {
   document.body.classList.toggle('theme-light');
   localStorage.setItem('dd_theme', document.body.classList.contains('theme-light') ? 'light' : 'dark');
+});
+
+// ---------- Sound & motion preferences ----------
+let soundEnabled = localStorage.getItem('dd_sound') !== 'off';
+let reduceMotion = localStorage.getItem('dd_reduce_motion') === 'on';
+document.getElementById('sound-toggle').checked = soundEnabled;
+document.getElementById('reduce-motion-toggle').checked = reduceMotion;
+document.getElementById('sound-toggle').addEventListener('change', e => {
+  soundEnabled = e.target.checked;
+  localStorage.setItem('dd_sound', soundEnabled ? 'on' : 'off');
+});
+document.getElementById('reduce-motion-toggle').addEventListener('change', e => {
+  reduceMotion = e.target.checked;
+  localStorage.setItem('dd_reduce_motion', reduceMotion ? 'on' : 'off');
+});
+
+// ---------- Slide-out menu ----------
+const menuDrawer = document.getElementById('menu-drawer');
+const menuBackdrop = document.getElementById('menu-backdrop');
+document.getElementById('menu-toggle-btn').addEventListener('click', () => {
+  menuDrawer.classList.add('open');
+  menuBackdrop.classList.remove('hidden');
+  updateLeaveRoomVisibility();
+});
+function closeMenu() {
+  menuDrawer.classList.remove('open');
+  menuBackdrop.classList.add('hidden');
+  showMenuView('main');
+}
+document.getElementById('menu-close-btn').addEventListener('click', closeMenu);
+menuBackdrop.addEventListener('click', closeMenu);
+
+function showMenuView(name) {
+  document.querySelectorAll('.menu-view').forEach(v => v.classList.add('hidden'));
+  document.getElementById('menu-view-' + name).classList.remove('hidden');
+  if (name === 'stats') renderAchievementsGrid();
+}
+document.querySelectorAll('.menu-item[data-view]').forEach(btn => {
+  btn.addEventListener('click', () => showMenuView(btn.dataset.view));
+});
+document.querySelectorAll('.menu-back-btn').forEach(btn => {
+  btn.addEventListener('click', () => showMenuView('main'));
+});
+
+function updateLeaveRoomVisibility() {
+  const inRoom = ['screen-lobby', 'screen-game', 'screen-end'].some(id => document.getElementById(id).classList.contains('active'));
+  document.getElementById('menu-leave-room-btn').classList.toggle('hidden', !inRoom);
+}
+document.getElementById('menu-leave-room-btn').addEventListener('click', () => {
+  socket.emit('leave-room');
+  localStorage.removeItem('dd_room');
+  location.reload();
 });
 
 // ---------- Screen helpers ----------
@@ -57,7 +109,10 @@ function levelFromXP(xp) { return Math.floor(Math.sqrt(xp / 40)) + 1; }
 function renderLevelBadge() {
   const xp = getXP();
   const lvl = levelFromXP(xp);
-  document.getElementById('level-badge').textContent = `Lv.${lvl} • ${xp} XP`;
+  const text = `Lv.${lvl} • ${xp} XP`;
+  document.getElementById('level-badge').textContent = text;
+  const menuLine = document.getElementById('menu-level-line');
+  if (menuLine) menuLine.textContent = text;
 }
 function addXP(amount) {
   const xp = getXP() + Math.max(0, Math.round(amount));
@@ -66,12 +121,31 @@ function addXP(amount) {
 }
 
 // ---------- Achievements ----------
+const ACHIEVEMENTS = [
+  { id: 'first_win', icon: '🏆', label: 'First Victory', desc: 'Finish a game in 1st place.' },
+  { id: 'streak3', icon: '🔥', label: 'On Fire', desc: 'Guess correctly 3 rounds in a row.' },
+  { id: 'fast_guesser', icon: '⚡', label: 'Lightning Guesser', desc: 'Guess a word almost instantly.' },
+  { id: 'fill_master', icon: '🪣', label: 'Bucket Master', desc: 'Use the fill tool while drawing.' },
+  { id: 'artist', icon: '🖌️', label: 'Shape Artist', desc: 'Use a shape tool while drawing.' }
+];
 function unlockAchievement(id, label) {
   const list = JSON.parse(localStorage.getItem('dd_achievements') || '[]');
   if (list.includes(id)) return;
   list.push(id);
   localStorage.setItem('dd_achievements', JSON.stringify(list));
   showToast('🏅 Achievement unlocked: ' + label);
+}
+function renderAchievementsGrid() {
+  const unlocked = JSON.parse(localStorage.getItem('dd_achievements') || '[]');
+  const grid = document.getElementById('achievements-grid');
+  grid.innerHTML = '';
+  ACHIEVEMENTS.forEach(a => {
+    const isUnlocked = unlocked.includes(a.id);
+    const row = document.createElement('div');
+    row.className = 'achievement-item' + (isUnlocked ? ' unlocked' : '');
+    row.innerHTML = `<span class="ach-icon">${a.icon}</span><span><b>${a.label}</b><br>${a.desc}</span>`;
+    grid.appendChild(row);
+  });
 }
 
 renderLevelBadge();
@@ -634,6 +708,7 @@ document.getElementById('undo-btn').addEventListener('click', () => socket.emit(
 
 // ---------- Confetti + sounds ----------
 function launchConfetti() {
+  if (reduceMotion) return;
   const colors = ['#ff6b6b', '#ffcf4d', '#5aa9ff', '#4fd6b0', '#a86bff'];
   for (let i = 0; i < 80; i++) {
     const piece = document.createElement('div');
@@ -653,6 +728,7 @@ function getAudioCtx() {
   return audioCtx;
 }
 function playWinJingle() {
+  if (!soundEnabled) return;
   try {
     const ctx2 = getAudioCtx();
     const notes = [523.25, 659.25, 783.99, 1046.5];
@@ -667,6 +743,7 @@ function playWinJingle() {
 }
 let lastTickPlayed = 0;
 function playTick() {
+  if (!soundEnabled) return;
   const now = Date.now();
   if (now - lastTickPlayed < 900) return;
   lastTickPlayed = now;
@@ -678,3 +755,399 @@ function playTick() {
     o.start(); g.gain.exponentialRampToValueAtTime(0.001, ctx2.currentTime + 0.08); o.stop(ctx2.currentTime + 0.08);
   } catch (e) {}
 }
+
+// =====================================================================
+// SOLO PLAY MODE — no server room needed, everything runs in the browser.
+// =====================================================================
+let wordBank = null;
+async function ensureWordBank() {
+  if (wordBank) return wordBank;
+  const res = await fetch('/api/words');
+  wordBank = await res.json();
+  return wordBank;
+}
+function pickSoloWord(pack, difficulty) {
+  const pool = (wordBank && wordBank[pack]) || (wordBank ? wordBank.english : []);
+  const filtered = (!difficulty || difficulty === 'mixed') ? pool : pool.filter(w => w.difficulty === difficulty);
+  const list = filtered.length ? filtered : pool;
+  return list[Math.floor(Math.random() * list.length)];
+}
+function currentSoloPackDiff() {
+  return {
+    pack: document.getElementById('solo-wordpack-select').value,
+    diff: document.querySelector('input[name="solo-difficulty"]:checked').value
+  };
+}
+
+document.getElementById('goto-solo-btn').addEventListener('click', async () => {
+  await ensureWordBank();
+  showScreen('screen-solo-hub');
+});
+document.getElementById('solo-hub-back-btn').addEventListener('click', () => showScreen('screen-home'));
+
+document.querySelectorAll('.solo-mode-btn').forEach(btn => {
+  btn.addEventListener('click', () => {
+    const mode = btn.dataset.mode;
+    const { pack, diff } = currentSoloPackDiff();
+    if (mode === 'practice') startSoloPractice(pack, diff);
+    else if (mode === 'rush') startSoloRush(pack, diff, false);
+    else if (mode === 'bot-guesses') startSoloRush(pack, diff, true);
+    else if (mode === 'bot-drawer') startSoloBotDrawer(pack, diff);
+  });
+});
+
+// ---------- Reusable local drawing canvas (used by two solo modes) ----------
+const SOLO_COLORS = ['#2c2a24', '#ff6b6b', '#ffcf4d', '#5aa9ff', '#4fd6b0', '#a86bff', '#ff9f4d', '#ffffff'];
+
+function setupDrawingCanvas(ids) {
+  const canvas = document.getElementById(ids.canvasId);
+  const ctx = canvas.getContext('2d');
+  const state = { tool: 'pen', color: '#2c2a24', size: 4, erasing: false, drawing: false, lastPoint: null, shapeStart: null, history: [] };
+
+  function resize() {
+    const rect = canvas.parentElement.getBoundingClientRect();
+    if (rect.width === 0 || rect.height === 0) return;
+    canvas.width = rect.width; canvas.height = rect.height;
+    redrawAll();
+  }
+  function clear() { ctx.clearRect(0, 0, canvas.width, canvas.height); ctx.fillStyle = '#faf3e2'; ctx.fillRect(0, 0, canvas.width, canvas.height); }
+  function redrawAll() { clear(); state.history.forEach(renderEntry); }
+
+  function localDraw(from, to, color, size) {
+    ctx.strokeStyle = color; ctx.lineWidth = size; ctx.lineCap = 'round'; ctx.lineJoin = 'round';
+    ctx.beginPath(); ctx.moveTo(from.x * canvas.width, from.y * canvas.height); ctx.lineTo(to.x * canvas.width, to.y * canvas.height); ctx.stroke();
+  }
+  function drawShapeOnCanvas(shape, x1, y1, x2, y2, color, size) {
+    const X1 = x1 * canvas.width, Y1 = y1 * canvas.height, X2 = x2 * canvas.width, Y2 = y2 * canvas.height;
+    ctx.strokeStyle = color; ctx.lineWidth = size; ctx.lineCap = 'round'; ctx.lineJoin = 'round';
+    ctx.beginPath();
+    if (shape === 'line') { ctx.moveTo(X1, Y1); ctx.lineTo(X2, Y2); }
+    else if (shape === 'rect') { ctx.rect(Math.min(X1, X2), Math.min(Y1, Y2), Math.abs(X2 - X1), Math.abs(Y2 - Y1)); }
+    else if (shape === 'circle') {
+      const rx = Math.abs(X2 - X1) / 2, ry = Math.abs(Y2 - Y1) / 2;
+      const cx = Math.min(X1, X2) + rx, cy = Math.min(Y1, Y2) + ry;
+      ctx.ellipse(cx, cy, Math.max(rx, 1), Math.max(ry, 1), 0, 0, Math.PI * 2);
+    }
+    ctx.stroke();
+  }
+  function floodFill(nx, ny, fillColorHex) {
+    const x0 = Math.floor(nx * canvas.width), y0 = Math.floor(ny * canvas.height);
+    if (x0 < 0 || y0 < 0 || x0 >= canvas.width || y0 >= canvas.height) return;
+    const img = ctx.getImageData(0, 0, canvas.width, canvas.height);
+    const data = img.data; const w = canvas.width, h = canvas.height;
+    const idx = (x, y) => (y * w + x) * 4;
+    const startIdx = idx(x0, y0);
+    const target = [data[startIdx], data[startIdx + 1], data[startIdx + 2]];
+    const fill = hexToRgba(fillColorHex);
+    if (target[0] === fill[0] && target[1] === fill[1] && target[2] === fill[2]) return;
+    const matches = (i) => Math.abs(data[i] - target[0]) < 40 && Math.abs(data[i + 1] - target[1]) < 40 && Math.abs(data[i + 2] - target[2]) < 40;
+    const stack = [[x0, y0]]; let guard = 0;
+    while (stack.length && guard < 400000) {
+      guard++;
+      const [x, y] = stack.pop();
+      if (x < 0 || y < 0 || x >= w || y >= h) continue;
+      const i = idx(x, y);
+      if (!matches(i)) continue;
+      data[i] = fill[0]; data[i + 1] = fill[1]; data[i + 2] = fill[2]; data[i + 3] = 255;
+      stack.push([x + 1, y], [x - 1, y], [x, y + 1], [x, y - 1]);
+    }
+    ctx.putImageData(img, 0, 0);
+  }
+  function hexToRgba(hex) {
+    const v = hex.replace('#', '');
+    const bigint = parseInt(v.length === 3 ? v.split('').map(c => c + c).join('') : v, 16);
+    return [(bigint >> 16) & 255, (bigint >> 8) & 255, bigint & 255, 255];
+  }
+  function renderEntry(entry) {
+    if (entry.type === 'stroke') localDraw(entry.from, entry.to, entry.color, entry.size);
+    else if (entry.type === 'shape') drawShapeOnCanvas(entry.shape, entry.x1, entry.y1, entry.x2, entry.y2, entry.color, entry.size);
+    else if (entry.type === 'fill') floodFill(entry.x, entry.y, entry.color);
+  }
+
+  function getPos(e) {
+    const rect = canvas.getBoundingClientRect();
+    const evt = e.touches ? e.touches[0] : e;
+    return { x: (evt.clientX - rect.left) / rect.width, y: (evt.clientY - rect.top) / rect.height };
+  }
+  function start(e) {
+    const pos = getPos(e);
+    if (state.tool === 'fill') {
+      const color = state.erasing ? '#faf3e2' : state.color;
+      floodFill(pos.x, pos.y, color);
+      state.history.push({ type: 'fill', x: pos.x, y: pos.y, color });
+      return;
+    }
+    state.drawing = true; state.lastPoint = pos;
+    if (state.tool !== 'pen') state.shapeStart = pos;
+  }
+  function move(e) {
+    if (!state.drawing) return;
+    e.preventDefault();
+    const pos = getPos(e);
+    if (state.tool === 'pen') {
+      const color = state.erasing ? '#faf3e2' : state.color;
+      localDraw(state.lastPoint, pos, color, state.size);
+      state.history.push({ type: 'stroke', from: state.lastPoint, to: pos, color, size: state.size });
+      state.lastPoint = pos;
+    } else {
+      redrawAll();
+      drawShapeOnCanvas(state.tool, state.shapeStart.x, state.shapeStart.y, pos.x, pos.y, state.color, state.size);
+    }
+  }
+  function end(e) {
+    if (state.drawing && state.tool !== 'pen' && state.shapeStart) {
+      const evt = (e && e.changedTouches) ? e.changedTouches[0] : e;
+      const pos = (evt && evt.clientX != null) ? getPos(evt) : state.shapeStart;
+      state.history.push({ type: 'shape', shape: state.tool, x1: state.shapeStart.x, y1: state.shapeStart.y, x2: pos.x, y2: pos.y, color: state.color, size: state.size });
+    }
+    state.drawing = false; state.lastPoint = null; state.shapeStart = null;
+  }
+  canvas.addEventListener('mousedown', start);
+  canvas.addEventListener('mousemove', move);
+  window.addEventListener('mouseup', end);
+  canvas.addEventListener('touchstart', e => { e.preventDefault(); start(e); }, { passive: false });
+  canvas.addEventListener('touchmove', move, { passive: false });
+  canvas.addEventListener('touchend', end);
+
+  const swatchBox = document.getElementById(ids.swatchContainerId);
+  SOLO_COLORS.forEach((c, i) => {
+    const sw = document.createElement('div');
+    sw.className = 'color-swatch' + (i === 0 ? ' active' : '');
+    sw.style.background = c;
+    sw.addEventListener('click', () => {
+      state.color = c; state.erasing = false;
+      swatchBox.querySelectorAll('.color-swatch').forEach(s => s.classList.remove('active'));
+      sw.classList.add('active');
+      document.getElementById(ids.eraserBtnId).classList.remove('active');
+    });
+    swatchBox.appendChild(sw);
+  });
+  document.querySelectorAll(ids.toolButtonSelector).forEach(btn => {
+    btn.addEventListener('click', () => {
+      state.tool = btn.dataset[ids.toolDataKey];
+      state.erasing = false;
+      document.querySelectorAll(ids.toolButtonSelector).forEach(b => b.classList.remove('active'));
+      btn.classList.add('active');
+      document.getElementById(ids.eraserBtnId).classList.remove('active');
+    });
+  });
+  document.getElementById(ids.brushSmallId).addEventListener('click', () => { state.size = 4; document.getElementById(ids.brushSmallId).classList.add('active'); document.getElementById(ids.brushLargeId).classList.remove('active'); });
+  document.getElementById(ids.brushLargeId).addEventListener('click', () => { state.size = 14; document.getElementById(ids.brushLargeId).classList.add('active'); document.getElementById(ids.brushSmallId).classList.remove('active'); });
+  document.getElementById(ids.eraserBtnId).addEventListener('click', () => {
+    state.erasing = !state.erasing; state.tool = 'pen';
+    document.querySelectorAll(ids.toolButtonSelector).forEach(b => b.classList.remove('active'));
+    document.getElementById(ids.eraserBtnId).classList.toggle('active', state.erasing);
+  });
+  document.getElementById(ids.undoBtnId).addEventListener('click', () => {
+    if (!state.history.length) return;
+    state.history.pop();
+    redrawAll();
+  });
+  document.getElementById(ids.clearBtnId).addEventListener('click', () => { state.history = []; clear(); });
+
+  return { canvas, ctx, state, resize, clear, redrawAll, getDataURL: () => canvas.toDataURL('image/png') };
+}
+
+// ---------- 🅰️ Draw Practice ----------
+let soloPracticeEditor = null, soloPracticeWord = null, soloPracticeTimer = null;
+function startSoloPractice(pack, diff) {
+  soloPracticeWord = pickSoloWord(pack, diff);
+  document.getElementById('solo-practice-word').textContent = `Draw: ${'•'.repeat(soloPracticeWord.word.length)} (${soloPracticeWord.difficulty})`;
+  showScreen('screen-solo-practice');
+  if (!soloPracticeEditor) {
+    soloPracticeEditor = setupDrawingCanvas({
+      canvasId: 'solo-practice-canvas', swatchContainerId: 'solo-practice-swatches',
+      toolButtonSelector: '#solo-practice-toolbar [data-solo-tool]', toolDataKey: 'soloTool',
+      brushSmallId: 'solo-brush-small', brushLargeId: 'solo-brush-large',
+      eraserBtnId: 'solo-eraser-btn', undoBtnId: 'solo-undo-btn', clearBtnId: 'solo-clear-btn'
+    });
+  }
+  soloPracticeEditor.state.history = [];
+  setTimeout(() => { soloPracticeEditor.resize(); }, 50);
+  let timeLeft = 60;
+  clearInterval(soloPracticeTimer);
+  document.getElementById('solo-practice-timer-fill').style.width = '100%';
+  soloPracticeTimer = setInterval(() => {
+    timeLeft--;
+    document.getElementById('solo-practice-timer-fill').style.width = Math.max(0, Math.min(100, (timeLeft / 60) * 100)) + '%';
+    if (timeLeft <= 0) { clearInterval(soloPracticeTimer); revealPracticeWord(); }
+  }, 1000);
+}
+function revealPracticeWord() { document.getElementById('solo-practice-word').textContent = `Word: ${soloPracticeWord.word.toUpperCase()}`; }
+document.getElementById('solo-practice-reveal-btn').addEventListener('click', revealPracticeWord);
+document.getElementById('solo-practice-download-btn').addEventListener('click', () => {
+  const a = document.createElement('a');
+  a.href = soloPracticeEditor.getDataURL();
+  a.download = `doodle-${soloPracticeWord.word}.png`;
+  a.click();
+});
+document.getElementById('solo-practice-next-btn').addEventListener('click', () => {
+  clearInterval(soloPracticeTimer);
+  const { pack, diff } = currentSoloPackDiff();
+  startSoloPractice(pack, diff);
+});
+document.getElementById('solo-practice-exit-btn').addEventListener('click', () => {
+  clearInterval(soloPracticeTimer);
+  showScreen('screen-solo-hub');
+});
+
+// ---------- 🅱️ Guess Rush & 🅲 Bot Draws, You Guess (shared mechanic) ----------
+let soloRushWord = null, soloRushTimer = null, soloRushScore = 0, soloRushStreak = 0;
+let soloRushMaskedWord = '', soloRushHintsSent = 0, soloRushTimeLeft = 0, soloRushTotal = 45;
+let soloRushIsBotVisual = false, soloBotAnimTimer = null;
+
+function startSoloRush(pack, diff, botVisual) {
+  soloRushIsBotVisual = botVisual;
+  document.getElementById('solo-rush-title').textContent = botVisual ? '🅲 Bot Draws, You Guess' : '🅱️ Guess Rush';
+  document.getElementById('solo-bot-canvas-wrap').classList.toggle('hidden', !botVisual);
+  soloRushScore = 0; soloRushStreak = 0;
+  document.getElementById('solo-rush-score').textContent = soloRushScore;
+  document.getElementById('solo-rush-streak').textContent = soloRushStreak;
+  const bestKey = botVisual ? 'dd_solo_bot_best' : 'dd_solo_rush_best';
+  document.getElementById('solo-rush-best').textContent = localStorage.getItem(bestKey) || 0;
+  showScreen('screen-solo-rush');
+  nextSoloRushWord(pack, diff);
+}
+function nextSoloRushWord(pack, diff) {
+  soloRushWord = pickSoloWord(pack, diff);
+  soloRushMaskedWord = soloRushWord.word.split('').map(c => (c === ' ' ? ' ' : '_')).join('');
+  soloRushHintsSent = 0;
+  soloRushTotal = soloRushWord.difficulty === 'hard' ? 70 : soloRushWord.difficulty === 'easy' ? 40 : 55;
+  soloRushTimeLeft = soloRushTotal;
+  document.getElementById('solo-rush-word').textContent = soloRushMaskedWord.split('').join(' ');
+  document.getElementById('solo-rush-feedback').textContent = '';
+  document.getElementById('solo-rush-input').value = '';
+  clearInterval(soloRushTimer);
+  document.getElementById('solo-rush-timer-fill').style.width = '100%';
+  if (soloRushIsBotVisual) startBotScribble();
+  soloRushTimer = setInterval(() => {
+    soloRushTimeLeft--;
+    document.getElementById('solo-rush-timer-fill').style.width = Math.max(0, Math.min(100, (soloRushTimeLeft / soloRushTotal) * 100)) + '%';
+    const frac = soloRushTimeLeft / soloRushTotal;
+    const fractions = [0.6, 0.35, 0.15];
+    if (soloRushHintsSent < fractions.length && frac <= fractions[soloRushHintsSent]) { soloRushHintsSent++; revealSoloHint(); }
+    if (soloRushTimeLeft <= 0) {
+      clearInterval(soloRushTimer); stopBotScribble();
+      soloRushStreak = 0;
+      document.getElementById('solo-rush-streak').textContent = soloRushStreak;
+      document.getElementById('solo-rush-feedback').textContent = `⏰ Time's up! The word was ${soloRushWord.word.toUpperCase()}`;
+      setTimeout(() => nextSoloRushWord(pack, diff), 1800);
+    }
+  }, 1000);
+}
+function revealSoloHint() {
+  const chars = soloRushMaskedWord.split('');
+  const hidden = [];
+  for (let i = 0; i < chars.length; i++) if (chars[i] === '_') hidden.push(i);
+  if (!hidden.length) return;
+  const idx = hidden[Math.floor(Math.random() * hidden.length)];
+  chars[idx] = soloRushWord.word[idx];
+  soloRushMaskedWord = chars.join('');
+  document.getElementById('solo-rush-word').textContent = soloRushMaskedWord.split('').join(' ');
+}
+document.getElementById('solo-rush-form').addEventListener('submit', e => {
+  e.preventDefault();
+  const input = document.getElementById('solo-rush-input');
+  const text = input.value.trim().toLowerCase();
+  input.value = '';
+  if (!soloRushWord) return;
+  const { pack, diff } = currentSoloPackDiff();
+  if (text === soloRushWord.word.toLowerCase()) {
+    clearInterval(soloRushTimer); stopBotScribble();
+    const mult = { easy: 1, medium: 1.25, hard: 1.5 }[soloRushWord.difficulty] || 1;
+    const base = Math.max(10, Math.round(100 * (soloRushTimeLeft / soloRushTotal)));
+    soloRushStreak++;
+    const streakBonus = soloRushStreak >= 2 ? Math.min(soloRushStreak * 5, 25) : 0;
+    const points = Math.round(base * mult) + streakBonus;
+    soloRushScore += points;
+    document.getElementById('solo-rush-score').textContent = soloRushScore;
+    document.getElementById('solo-rush-streak').textContent = soloRushStreak;
+    document.getElementById('solo-rush-feedback').textContent = `🎉 Correct! +${points}${soloRushStreak >= 2 ? ' (🔥 streak ' + soloRushStreak + ')' : ''}`;
+    const bestKey = soloRushIsBotVisual ? 'dd_solo_bot_best' : 'dd_solo_rush_best';
+    const best = parseInt(localStorage.getItem(bestKey) || '0', 10);
+    if (soloRushScore > best) { localStorage.setItem(bestKey, soloRushScore); document.getElementById('solo-rush-best').textContent = soloRushScore; }
+    if (soloRushStreak >= 3) unlockAchievement('streak3', 'On Fire (3 streak)');
+    setTimeout(() => nextSoloRushWord(pack, diff), 1200);
+  } else {
+    document.getElementById('solo-rush-feedback').textContent = `❌ "${escapeHtml(text)}" isn't it — keep trying!`;
+  }
+});
+document.getElementById('solo-rush-exit-btn').addEventListener('click', () => {
+  clearInterval(soloRushTimer); stopBotScribble();
+  showScreen('screen-solo-hub');
+});
+
+function startBotScribble() {
+  const canvas = document.getElementById('solo-bot-canvas');
+  const ctx = canvas.getContext('2d');
+  const rect = canvas.parentElement.getBoundingClientRect();
+  canvas.width = rect.width; canvas.height = rect.height;
+  ctx.fillStyle = '#faf3e2'; ctx.fillRect(0, 0, canvas.width, canvas.height);
+  let last = null;
+  clearInterval(soloBotAnimTimer);
+  soloBotAnimTimer = setInterval(() => {
+    const p = { x: Math.random() * canvas.width, y: Math.random() * canvas.height };
+    if (last) {
+      ctx.strokeStyle = '#2c2a24'; ctx.lineWidth = 3; ctx.lineCap = 'round';
+      ctx.beginPath(); ctx.moveTo(last.x, last.y); ctx.lineTo(p.x, p.y); ctx.stroke();
+    }
+    last = p;
+  }, 220);
+}
+function stopBotScribble() { clearInterval(soloBotAnimTimer); }
+
+// ---------- 🅲 You Draw, Bot Guesses ----------
+let soloBdEditor = null, soloBdWord = null, soloBdTimer = null, soloBdTimeLeft = 0, soloBdTotal = 60, soloBdGuessScheduled = false;
+
+function startSoloBotDrawer(pack, diff) {
+  soloBdWord = pickSoloWord(pack, diff);
+  document.getElementById('solo-bd-word').textContent = `Draw: ${soloBdWord.word.toUpperCase()} (${soloBdWord.difficulty})`;
+  document.getElementById('solo-bd-bot-status').textContent = '🤖 Watching you draw…';
+  showScreen('screen-solo-botdrawer');
+  if (!soloBdEditor) {
+    soloBdEditor = setupDrawingCanvas({
+      canvasId: 'solo-bd-canvas', swatchContainerId: 'solo-bd-swatches',
+      toolButtonSelector: '#solo-bd-toolbar [data-solobd-tool]', toolDataKey: 'solobdTool',
+      brushSmallId: 'solo-bd-brush-small', brushLargeId: 'solo-bd-brush-large',
+      eraserBtnId: 'solo-bd-eraser-btn', undoBtnId: 'solo-bd-undo-btn', clearBtnId: 'solo-bd-clear-btn'
+    });
+  }
+  soloBdEditor.state.history = [];
+  setTimeout(() => { soloBdEditor.resize(); }, 50);
+  soloBdTotal = soloBdWord.difficulty === 'hard' ? 75 : soloBdWord.difficulty === 'easy' ? 45 : 60;
+  soloBdTimeLeft = soloBdTotal;
+  document.getElementById('solo-bd-timer-fill').style.width = '100%';
+  soloBdGuessScheduled = false;
+  clearInterval(soloBdTimer);
+  soloBdTimer = setInterval(() => {
+    soloBdTimeLeft--;
+    document.getElementById('solo-bd-timer-fill').style.width = Math.max(0, Math.min(100, (soloBdTimeLeft / soloBdTotal) * 100)) + '%';
+    maybeBotGuess();
+    if (soloBdTimeLeft <= 0) {
+      clearInterval(soloBdTimer);
+      if (!soloBdGuessScheduled) document.getElementById('solo-bd-bot-status').textContent = `🤖 I give up! Was it "${soloBdWord.word}"?`;
+    }
+  }, 1000);
+}
+function maybeBotGuess() {
+  if (soloBdGuessScheduled || !soloBdEditor) return;
+  const elapsedFrac = 1 - (soloBdTimeLeft / soloBdTotal);
+  const strokes = soloBdEditor.state.history.length;
+  const chance = Math.min(0.9, elapsedFrac * 0.6 + Math.min(strokes / 40, 1) * 0.4);
+  if (Math.random() < chance * 0.25) {
+    soloBdGuessScheduled = true;
+    document.getElementById('solo-bd-bot-status').textContent = '🤖 Thinking…';
+    setTimeout(() => {
+      document.getElementById('solo-bd-bot-status').innerHTML = `🤖 I think it's… <b>${soloBdWord.word.toUpperCase()}</b>! 🎉`;
+    }, 900);
+  }
+}
+document.getElementById('solo-bd-next-btn').addEventListener('click', () => {
+  clearInterval(soloBdTimer);
+  const { pack, diff } = currentSoloPackDiff();
+  startSoloBotDrawer(pack, diff);
+});
+document.getElementById('solo-bd-exit-btn').addEventListener('click', () => {
+  clearInterval(soloBdTimer);
+  showScreen('screen-solo-hub');
+});

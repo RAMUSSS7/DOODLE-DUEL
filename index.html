@@ -9,7 +9,61 @@
 <body>
 
 <div class="chalk-dust"></div>
-<button id="theme-toggle" class="theme-toggle-btn" title="Toggle theme">🌓</button>
+<button id="menu-toggle-btn" class="menu-toggle-btn" title="Menu">☰ Menu</button>
+
+<div id="menu-backdrop" class="menu-backdrop hidden"></div>
+<div id="menu-drawer" class="menu-drawer">
+  <div class="menu-header">
+    <span class="menu-title">Doodle<span class="logo-accent">Duel</span></span>
+    <button id="menu-close-btn" class="menu-close-btn">✕</button>
+  </div>
+
+  <div id="menu-view-main" class="menu-view">
+    <button class="menu-item" data-view="settings">⚙️ Settings</button>
+    <button class="menu-item" data-view="stats">📊 My Stats</button>
+    <button class="menu-item" data-view="howto">📖 How to Play</button>
+    <button class="menu-item" data-view="about">ℹ️ About</button>
+    <button id="menu-leave-room-btn" class="menu-item menu-item-danger hidden">🚪 Leave Room</button>
+  </div>
+
+  <div id="menu-view-settings" class="menu-view hidden">
+    <button class="menu-back-btn">← Back</button>
+    <h3>Settings</h3>
+    <label class="checkbox-row"><input type="checkbox" id="sound-toggle"> Sound effects</label>
+    <label class="checkbox-row"><input type="checkbox" id="reduce-motion-toggle"> Reduce animations (no confetti)</label>
+    <div class="theme-switch-row">
+      <span>Theme</span>
+      <button id="theme-toggle-inline" class="btn btn-secondary btn-small">🌓 Switch theme</button>
+    </div>
+  </div>
+
+  <div id="menu-view-stats" class="menu-view hidden">
+    <button class="menu-back-btn">← Back</button>
+    <h3>My Stats</h3>
+    <p id="menu-level-line" class="level-badge">Lv.1 • 0 XP</p>
+    <div id="achievements-grid" class="achievements-grid"></div>
+  </div>
+
+  <div id="menu-view-howto" class="menu-view hidden">
+    <button class="menu-back-btn">← Back</button>
+    <h3>How to Play</h3>
+    <ul class="howto-list">
+      <li>One player draws a secret word while everyone else guesses in the chat.</li>
+      <li>Guess fast for more points — the first correct guess earns a 🥇 bonus.</li>
+      <li>Guess correctly several rounds in a row to build a 🔥 streak bonus.</li>
+      <li>Harder words are worth more points than easy ones.</li>
+      <li>Team Mode splits everyone into two teams whose scores add up together.</li>
+      <li>A bonus Speed Round (if the host enabled it) doubles points for one fast final round.</li>
+    </ul>
+  </div>
+
+  <div id="menu-view-about" class="menu-view hidden">
+    <button class="menu-back-btn">← Back</button>
+    <h3>About</h3>
+    <p class="hint-text">Doodle Duel — a real-time online draw &amp; guess party game.<br><br>Made with Node.js &amp; Socket.io.</p>
+  </div>
+</div>
+
 
 <!-- HOME SCREEN -->
 <section id="screen-home" class="screen active">
@@ -26,6 +80,8 @@
 
     <button id="goto-settings-btn" class="btn btn-primary">Create a Room</button>
     <button id="browse-rooms-btn" class="btn btn-text">🔎 Browse public rooms</button>
+    <div class="divider"><span>or play alone</span></div>
+    <button id="goto-solo-btn" class="btn btn-secondary">🎮 Solo Play</button>
 
     <div class="divider"><span>or join one</span></div>
 
@@ -73,6 +129,138 @@
     <button id="settings-back-btn" class="btn btn-text">← Back</button>
   </div>
 </section>
+
+<!-- SOLO PLAY HUB -->
+<section id="screen-solo-hub" class="screen">
+  <div class="board-frame settings-card">
+    <p class="eyebrow">Solo Play</p>
+
+    <div class="wordpack-picker">
+      <label for="solo-wordpack-select">Word pack</label>
+      <select id="solo-wordpack-select">
+        <option value="english">English</option>
+        <option value="arabic">العربية (Arabic)</option>
+      </select>
+    </div>
+    <div class="wordpack-picker">
+      <label>Difficulty</label>
+      <div class="difficulty-options">
+        <label class="radio-pill"><input type="radio" name="solo-difficulty" value="mixed" checked> 🎲 Mixed</label>
+        <label class="radio-pill"><input type="radio" name="solo-difficulty" value="easy"> 🟢 Easy</label>
+        <label class="radio-pill"><input type="radio" name="solo-difficulty" value="medium"> 🟡 Medium</label>
+        <label class="radio-pill"><input type="radio" name="solo-difficulty" value="hard"> 🔴 Hard</label>
+      </div>
+    </div>
+
+    <button class="btn btn-primary solo-mode-btn" data-mode="practice">🅰️ Draw Practice — sketch freely, no pressure</button>
+    <button class="btn btn-primary solo-mode-btn" data-mode="rush">🅱️ Guess Rush — race the clock with hints</button>
+    <button class="btn btn-primary solo-mode-btn" data-mode="bot-guesses">🅲 Bot Draws, You Guess</button>
+    <button class="btn btn-primary solo-mode-btn" data-mode="bot-drawer">🅲 You Draw, Bot Guesses</button>
+    <p class="hint-text">🤖 Heads up: the bot doesn't actually "see" your drawing — it reacts to time and how much you've drawn, just for a fun practice feel.</p>
+
+    <button id="solo-hub-back-btn" class="btn btn-text">← Back</button>
+  </div>
+</section>
+
+<!-- SOLO: DRAW PRACTICE -->
+<section id="screen-solo-practice" class="screen">
+  <div class="game-topbar">
+    <div class="topbar-item">🅰️ Draw Practice</div>
+    <div class="timer-track"><div id="solo-practice-timer-fill" class="timer-fill"></div></div>
+    <div class="topbar-item word-display" id="solo-practice-word">draw: ?????</div>
+  </div>
+  <div class="game-main solo-main">
+    <div class="canvas-wrap">
+      <div class="canvas-paper">
+        <canvas id="solo-practice-canvas"></canvas>
+      </div>
+      <div class="toolbar" id="solo-practice-toolbar">
+        <div class="colors" id="solo-practice-swatches"></div>
+        <div class="tool-group">
+          <button class="tool-btn tool-select active" data-solo-tool="pen" title="Pen">✏️</button>
+          <button class="tool-btn tool-select" data-solo-tool="line" title="Line">╱</button>
+          <button class="tool-btn tool-select" data-solo-tool="rect" title="Rectangle">▭</button>
+          <button class="tool-btn tool-select" data-solo-tool="circle" title="Circle">◯</button>
+          <button class="tool-btn tool-select" data-solo-tool="fill" title="Fill bucket">🪣</button>
+          <button class="tool-btn" id="solo-brush-small" title="Thin">●</button>
+          <button class="tool-btn" id="solo-brush-large" title="Thick">⬤</button>
+          <button class="tool-btn" id="solo-eraser-btn" title="Eraser">🧽</button>
+          <button class="tool-btn" id="solo-undo-btn" title="Undo">↩️</button>
+          <button class="tool-btn" id="solo-clear-btn" title="Clear canvas">🗑</button>
+        </div>
+      </div>
+    </div>
+  </div>
+  <div class="solo-action-row">
+    <button id="solo-practice-reveal-btn" class="btn btn-secondary btn-small">👁 Reveal word</button>
+    <button id="solo-practice-download-btn" class="btn btn-secondary btn-small">⬇ Download drawing</button>
+    <button id="solo-practice-next-btn" class="btn btn-primary btn-small">Next word</button>
+    <button id="solo-practice-exit-btn" class="btn btn-text">← Exit</button>
+  </div>
+</section>
+
+<!-- SOLO: GUESS RUSH / BOT DRAWS -->
+<section id="screen-solo-rush" class="screen">
+  <div class="board-frame solo-rush-card">
+    <p class="eyebrow" id="solo-rush-title">🅱️ Guess Rush</p>
+    <div class="game-topbar solo-rush-topbar">
+      <div class="topbar-item">Score <span id="solo-rush-score">0</span></div>
+      <div class="timer-track"><div id="solo-rush-timer-fill" class="timer-fill"></div></div>
+      <div class="topbar-item">🔥 <span id="solo-rush-streak">0</span></div>
+    </div>
+    <div id="solo-bot-canvas-wrap" class="canvas-paper solo-bot-canvas hidden">
+      <canvas id="solo-bot-canvas"></canvas>
+    </div>
+    <div class="word-display solo-rush-word" id="solo-rush-word">_ _ _ _</div>
+    <form id="solo-rush-form" class="guess-form">
+      <input id="solo-rush-input" placeholder="Type your guess…" autocomplete="off">
+      <button type="submit" class="btn btn-primary btn-small">Guess</button>
+    </form>
+    <p id="solo-rush-feedback" class="hint-text"></p>
+    <p class="hint-text">Best score: <b id="solo-rush-best">0</b></p>
+    <button id="solo-rush-exit-btn" class="btn btn-text">← Exit</button>
+  </div>
+</section>
+
+<!-- SOLO: YOU DRAW, BOT GUESSES -->
+<section id="screen-solo-botdrawer" class="screen">
+  <div class="game-topbar">
+    <div class="topbar-item">🅲 You Draw, Bot Guesses</div>
+    <div class="timer-track"><div id="solo-bd-timer-fill" class="timer-fill"></div></div>
+    <div class="topbar-item word-display" id="solo-bd-word">draw: ?????</div>
+  </div>
+  <div class="game-main solo-main">
+    <aside class="sidebar solo-bot-panel">
+      <h3>🤖 Bot</h3>
+      <p id="solo-bd-bot-status" class="hint-text">Watching you draw…</p>
+    </aside>
+    <div class="canvas-wrap">
+      <div class="canvas-paper">
+        <canvas id="solo-bd-canvas"></canvas>
+      </div>
+      <div class="toolbar" id="solo-bd-toolbar">
+        <div class="colors" id="solo-bd-swatches"></div>
+        <div class="tool-group">
+          <button class="tool-btn tool-select active" data-solobd-tool="pen" title="Pen">✏️</button>
+          <button class="tool-btn tool-select" data-solobd-tool="line" title="Line">╱</button>
+          <button class="tool-btn tool-select" data-solobd-tool="rect" title="Rectangle">▭</button>
+          <button class="tool-btn tool-select" data-solobd-tool="circle" title="Circle">◯</button>
+          <button class="tool-btn tool-select" data-solobd-tool="fill" title="Fill bucket">🪣</button>
+          <button class="tool-btn" id="solo-bd-brush-small" title="Thin">●</button>
+          <button class="tool-btn" id="solo-bd-brush-large" title="Thick">⬤</button>
+          <button class="tool-btn" id="solo-bd-eraser-btn" title="Eraser">🧽</button>
+          <button class="tool-btn" id="solo-bd-undo-btn" title="Undo">↩️</button>
+          <button class="tool-btn" id="solo-bd-clear-btn" title="Clear canvas">🗑</button>
+        </div>
+      </div>
+    </div>
+  </div>
+  <div class="solo-action-row">
+    <button id="solo-bd-next-btn" class="btn btn-primary btn-small">Next word</button>
+    <button id="solo-bd-exit-btn" class="btn btn-text">← Exit</button>
+  </div>
+</section>
+
 
 <!-- BROWSE PUBLIC ROOMS OVERLAY -->
 <div id="browse-overlay" class="overlay hidden">
