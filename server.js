@@ -129,8 +129,11 @@ function getWordPool(room) {
 }
 
 function pickWordOptions(room) {
-  let pool = getWordPool(room).filter(e => !room.usedWords.has(e.word));
-  if (pool.length < 3) { room.usedWords.clear(); pool = getWordPool(room).slice(); }
+  const basePool = getWordPool(room);
+  const diffOk = e => (!room.difficultyFilter || room.difficultyFilter === 'mixed') ? true : e.difficulty === room.difficultyFilter;
+  let pool = basePool.filter(diffOk).filter(e => !room.usedWords.has(e.word));
+  if (pool.length < 3) { room.usedWords.clear(); pool = basePool.filter(diffOk); }
+  if (pool.length < 3) pool = basePool.slice(); // fallback if the chosen difficulty has too few words
   const options = [];
   for (let i = 0; i < 3 && pool.length; i++) {
     const idx = Math.floor(Math.random() * pool.length);
@@ -154,7 +157,7 @@ function startChoosing(room) {
   room.roundNumber++;
 
   if (room.roundNumber > room.totalRounds) {
-    if (!room.speedRoundDone && connectedCount(room) >= 2) {
+    if (room.speedRoundEnabled && !room.speedRoundDone && connectedCount(room) >= 2) {
       room.speedRoundDone = true;
       room.isSpeedRound = true;
       room.totalRounds += 1;
@@ -286,14 +289,18 @@ function resetGame(room) {
     p.score = 0; p.guessedThisRound = false; p.streak = 0; p.fastestCount = 0; p.pointsAsDrawer = 0; p.team = null;
   });
   broadcastPlayers(room);
-  io.to(room.code).emit('back-to-lobby', { wordPack: room.wordPack, teamMode: room.teamMode, isPublic: room.isPublic });
+  io.to(room.code).emit('back-to-lobby', {
+    wordPack: room.wordPack, teamMode: room.teamMode, isPublic: room.isPublic,
+    difficulty: room.difficultyFilter, speedRoundEnabled: room.speedRoundEnabled
+  });
 }
 
 function sendResumeState(socket, room, player) {
   socket.emit('room-joined', {
     code: room.code, you: player.token, hostToken: room.hostToken,
     players: publicPlayers(room), wordPack: room.wordPack, gameState: room.state,
-    teamMode: room.teamMode, isPublic: room.isPublic
+    teamMode: room.teamMode, isPublic: room.isPublic,
+    difficulty: room.difficultyFilter, speedRoundEnabled: room.speedRoundEnabled
   });
   if (room.state === 'lobby') return;
 
@@ -333,15 +340,23 @@ function publicRoomsList() {
 }
 
 io.on('connection', socket => {
-  socket.on('create-room', ({ name, token, isPublic }) => {
+  socket.on('create-room', ({ name, token, isPublic, wordPack, customWords, difficulty, speedRoundEnabled, teamMode }) => {
     const code = makeRoomCode();
     const room = {
       code, players: [], hostToken: token, state: 'lobby', currentDrawerIndex: -1,
       currentWord: null, maskedWord: null, roundNumber: 0, totalRounds: 0, timer: null, timeLeft: 0,
       wordOptions: [], drawingHistory: [], groupCounter: 0, currentGroupId: null, hintsSent: 0,
-      wordPack: 'english', customWords: [], usedWords: new Set(), firstGuesserToken: null,
-      isPublic: !!isPublic, teamMode: false, speedRoundDone: false, isSpeedRound: false
+      wordPack: ['english', 'arabic', 'custom'].includes(wordPack) ? wordPack : 'english',
+      customWords: [], usedWords: new Set(), firstGuesserToken: null,
+      isPublic: !!isPublic, teamMode: !!teamMode,
+      speedRoundEnabled: speedRoundEnabled !== false, speedRoundDone: false, isSpeedRound: false,
+      difficultyFilter: ['easy', 'medium', 'hard', 'mixed'].includes(difficulty) ? difficulty : 'mixed'
     };
+    if (room.wordPack === 'custom') {
+      const cleaned = (customWords || []).map(x => String(x).trim()).filter(x => x.length >= 2 && x.length <= 24);
+      room.customWords = cleaned.length >= 5 ? cleaned : [];
+      if (!room.customWords.length) room.wordPack = 'english'; // fallback if custom list was too short
+    }
     room.players.push(newPlayer(token, socket.id, name));
     rooms[code] = room;
     socket.join(code);
@@ -349,7 +364,8 @@ io.on('connection', socket => {
     socket.data.token = token;
     socket.emit('room-joined', {
       code, you: token, hostToken: room.hostToken, players: publicPlayers(room),
-      wordPack: room.wordPack, gameState: room.state, teamMode: room.teamMode, isPublic: room.isPublic
+      wordPack: room.wordPack, gameState: room.state, teamMode: room.teamMode, isPublic: room.isPublic,
+      difficulty: room.difficultyFilter, speedRoundEnabled: room.speedRoundEnabled
     });
   });
 
@@ -381,36 +397,14 @@ io.on('connection', socket => {
     socket.data.token = token;
     socket.emit('room-joined', {
       code, you: token, hostToken: room.hostToken, players: publicPlayers(room),
-      wordPack: room.wordPack, gameState: room.state, teamMode: room.teamMode, isPublic: room.isPublic
+      wordPack: room.wordPack, gameState: room.state, teamMode: room.teamMode, isPublic: room.isPublic,
+      difficulty: room.difficultyFilter, speedRoundEnabled: room.speedRoundEnabled
     });
     broadcastPlayers(room);
   });
 
   socket.on('list-public-rooms', () => {
     socket.emit('public-rooms-list', { rooms: publicRoomsList() });
-  });
-
-  socket.on('set-word-pack', ({ pack, customWords }) => {
-    const room = rooms[socket.data.roomCode];
-    if (!room || room.hostToken !== socket.data.token || room.state !== 'lobby') return;
-    if (!['english', 'arabic', 'custom'].includes(pack)) return;
-    room.wordPack = pack;
-    if (pack === 'custom') {
-      const cleaned = (customWords || []).map(x => String(x).trim()).filter(x => x.length >= 2 && x.length <= 24);
-      if (cleaned.length < 5) return socket.emit('join-error', { message: 'Add at least 5 custom words.' });
-      room.customWords = cleaned;
-    }
-    room.usedWords = new Set();
-    io.to(room.code).emit('word-pack-update', { wordPack: room.wordPack, customCount: room.customWords.length });
-  });
-
-  socket.on('set-team-mode', ({ enabled }) => {
-    const room = rooms[socket.data.roomCode];
-    if (!room || room.hostToken !== socket.data.token || room.state !== 'lobby') return;
-    room.teamMode = !!enabled;
-    if (room.teamMode) assignTeams(room);
-    else room.players.forEach(p => (p.team = null));
-    broadcastPlayers(room);
   });
 
   socket.on('start-game', () => {

@@ -24,11 +24,7 @@
       <input id="name-input" maxlength="16" placeholder="e.g. Amine" autocomplete="off">
     </div>
 
-    <label class="checkbox-row">
-      <input type="checkbox" id="public-room-checkbox"> Make this room public (anyone can find & join)
-    </label>
-
-    <button id="create-room-btn" class="btn btn-primary">Create a Room</button>
+    <button id="goto-settings-btn" class="btn btn-primary">Create a Room</button>
     <button id="browse-rooms-btn" class="btn btn-text">🔎 Browse public rooms</button>
 
     <div class="divider"><span>or join one</span></div>
@@ -39,6 +35,42 @@
     </div>
 
     <p id="home-error" class="error-text"></p>
+  </div>
+</section>
+
+<!-- GAME SETTINGS SCREEN (host configures everything before the room is created) -->
+<section id="screen-settings" class="screen">
+  <div class="board-frame settings-card">
+    <p class="eyebrow">Set up your game</p>
+
+    <div class="wordpack-picker">
+      <label for="wordpack-select">Word pack</label>
+      <select id="wordpack-select">
+        <option value="english">English</option>
+        <option value="arabic">العربية (Arabic)</option>
+        <option value="custom">Custom words</option>
+      </select>
+      <div id="custom-words-box" class="hidden">
+        <textarea id="custom-words-input" placeholder="Type words separated by commas: cat, pizza, moon…"></textarea>
+      </div>
+    </div>
+
+    <div class="wordpack-picker">
+      <label>Word difficulty</label>
+      <div class="difficulty-options">
+        <label class="radio-pill"><input type="radio" name="difficulty" value="mixed" checked> 🎲 Mixed</label>
+        <label class="radio-pill"><input type="radio" name="difficulty" value="easy"> 🟢 Easy</label>
+        <label class="radio-pill"><input type="radio" name="difficulty" value="medium"> 🟡 Medium</label>
+        <label class="radio-pill"><input type="radio" name="difficulty" value="hard"> 🔴 Hard</label>
+      </div>
+    </div>
+
+    <label class="checkbox-row"><input type="checkbox" id="speed-round-checkbox" checked> Add a bonus Speed Round at the end (2x points, 30s)</label>
+    <label class="checkbox-row"><input type="checkbox" id="team-mode-checkbox"> Team Mode (2 teams)</label>
+    <label class="checkbox-row"><input type="checkbox" id="public-room-checkbox"> Make this room public (anyone can find & join)</label>
+
+    <button id="create-room-btn" class="btn btn-primary">Create Room</button>
+    <button id="settings-back-btn" class="btn btn-text">← Back</button>
   </div>
 </section>
 
@@ -62,21 +94,7 @@
       <ul id="lobby-player-list" class="player-list"></ul>
     </div>
 
-    <div id="wordpack-picker" class="wordpack-picker" style="display:none">
-      <label for="wordpack-select">Word pack</label>
-      <select id="wordpack-select">
-        <option value="english">English</option>
-        <option value="arabic">العربية (Arabic)</option>
-        <option value="custom">Custom words</option>
-      </select>
-      <div id="custom-words-box" class="hidden">
-        <textarea id="custom-words-input" placeholder="Type words separated by commas: cat, pizza, moon…"></textarea>
-        <button id="save-wordpack-btn" class="btn btn-secondary btn-small">Save word pack</button>
-      </div>
-      <div id="team-mode-row" class="checkbox-row team-mode-row">
-        <label><input type="checkbox" id="team-mode-checkbox"> Team Mode (2 teams)</label>
-      </div>
-    </div>
+    <p id="lobby-settings-summary" class="settings-summary"></p>
 
     <button id="start-game-btn" class="btn btn-primary">Start Game</button>
     <p id="lobby-hint" class="hint-text">Waiting for the host to start the game…</p>
@@ -88,6 +106,7 @@
 <div id="choose-overlay" class="overlay hidden">
   <div class="board-frame choose-card">
     <p class="eyebrow" id="choose-heading">Pick a word to draw</p>
+
     <div id="choose-options" class="choose-options"></div>
     <div class="choose-timer" id="choose-timer">10</div>
   </div>

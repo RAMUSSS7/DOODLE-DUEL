@@ -82,13 +82,31 @@ const codeInput = document.getElementById('code-input');
 const homeError = document.getElementById('home-error');
 nameInput.value = savedName;
 
-document.getElementById('create-room-btn').addEventListener('click', () => {
+document.getElementById('goto-settings-btn').addEventListener('click', () => {
   const name = nameInput.value.trim();
   if (!name) return (homeError.textContent = 'Type your name first.');
   homeError.textContent = '';
+  showScreen('screen-settings');
+});
+document.getElementById('settings-back-btn').addEventListener('click', () => showScreen('screen-home'));
+
+document.getElementById('create-room-btn').addEventListener('click', () => {
+  const name = nameInput.value.trim();
+  if (!name) { showScreen('screen-home'); homeError.textContent = 'Type your name first.'; return; }
   localStorage.setItem('dd_name', name);
+  const wordPack = packSelect.value;
+  const customWords = wordPack === 'custom'
+    ? document.getElementById('custom-words-input').value.split(',').map(w => w.trim()).filter(Boolean)
+    : [];
+  if (wordPack === 'custom' && customWords.length < 5) {
+    alert('Add at least 5 custom words (separated by commas) or pick a different word pack.');
+    return;
+  }
+  const difficulty = document.querySelector('input[name="difficulty"]:checked').value;
+  const speedRoundEnabled = document.getElementById('speed-round-checkbox').checked;
+  const teamMode = document.getElementById('team-mode-checkbox').checked;
   const isPublic = document.getElementById('public-room-checkbox').checked;
-  socket.emit('create-room', { name, token: myToken, isPublic });
+  socket.emit('create-room', { name, token: myToken, isPublic, wordPack, customWords, difficulty, speedRoundEnabled, teamMode });
 });
 
 document.getElementById('join-room-btn').addEventListener('click', () => {
@@ -105,6 +123,11 @@ socket.on('join-error', ({ message }) => {
   homeError.textContent = message;
   document.getElementById('reconnect-msg').classList.add('hidden');
 });
+
+// ---------- Word pack UI helpers (used on the settings screen) ----------
+const packSelect = document.getElementById('wordpack-select');
+const customBox = document.getElementById('custom-words-box');
+packSelect.addEventListener('change', () => customBox.classList.toggle('hidden', packSelect.value !== 'custom'));
 
 // ---------- Browse public rooms ----------
 document.getElementById('browse-rooms-btn').addEventListener('click', () => {
@@ -149,14 +172,13 @@ function attemptAutoRejoin() {
 socket.on('connect', () => attemptAutoRejoin());
 
 // ---------- Lobby ----------
-socket.on('room-joined', ({ code, hostToken: hT, players, wordPack, gameState, teamMode, isPublic }) => {
+socket.on('room-joined', ({ code, hostToken: hT, players, wordPack, gameState, teamMode, isPublic, difficulty, speedRoundEnabled }) => {
   hostToken = hT;
   localStorage.setItem('dd_room', code);
   document.getElementById('room-code-display').textContent = code;
   document.getElementById('reconnect-msg').classList.add('hidden');
-  setWordPackUI(wordPack);
-  document.getElementById('team-mode-checkbox').checked = !!teamMode;
   document.getElementById('public-room-lobby-tag').classList.toggle('hidden', !isPublic);
+  renderSettingsSummary(wordPack, teamMode, difficulty, speedRoundEnabled);
   if (gameState === 'lobby') showScreen('screen-lobby');
   renderPlayerList(players);
 });
@@ -167,15 +189,19 @@ document.getElementById('leave-room-btn').addEventListener('click', () => {
   localStorage.removeItem('dd_room');
   location.reload();
 });
-document.getElementById('team-mode-checkbox').addEventListener('change', e => {
-  socket.emit('set-team-mode', { enabled: e.target.checked });
+
+socket.on('back-to-lobby', ({ wordPack, teamMode, difficulty, speedRoundEnabled }) => {
+  showScreen('screen-lobby');
+  renderSettingsSummary(wordPack, teamMode, difficulty, speedRoundEnabled);
 });
 
-socket.on('back-to-lobby', ({ wordPack, teamMode }) => {
-  showScreen('screen-lobby');
-  setWordPackUI(wordPack);
-  document.getElementById('team-mode-checkbox').checked = !!teamMode;
-});
+function renderSettingsSummary(wordPack, teamMode, difficulty, speedRoundEnabled) {
+  const packLabel = { english: '📖 English', arabic: '📖 العربية', custom: '📖 Custom words' }[wordPack] || '📖 English';
+  const diffLabel = { mixed: '🎲 Mixed', easy: '🟢 Easy', medium: '🟡 Medium', hard: '🔴 Hard' }[difficulty] || '🎲 Mixed';
+  const speedLabel = speedRoundEnabled ? '⚡ Speed round: On' : '⚡ Speed round: Off';
+  const teamLabel = teamMode ? '👥 Team mode: On' : '👥 Team mode: Off';
+  document.getElementById('lobby-settings-summary').textContent = `${packLabel} • ${diffLabel} • ${speedLabel} • ${teamLabel}`;
+}
 
 socket.on('players-update', ({ players, hostToken: hT, teamMode, teams }) => {
   hostToken = hT;
@@ -184,8 +210,6 @@ socket.on('players-update', ({ players, hostToken: hT, teamMode, teams }) => {
   document.getElementById('start-game-btn').style.display = iAmHost ? 'block' : 'none';
   document.getElementById('lobby-hint').style.display = iAmHost ? 'none' : 'block';
   document.getElementById('lobby-count').textContent = `(${players.length})`;
-  document.getElementById('wordpack-picker').style.display = iAmHost ? 'block' : 'none';
-  document.getElementById('team-mode-row').style.display = iAmHost ? 'flex' : 'none';
 });
 
 function renderPlayerList(players, teamMode, teams) {
@@ -214,22 +238,6 @@ function renderPlayerList(players, teamMode, teams) {
   } else {
     teamBar.classList.add('hidden');
   }
-}
-
-// ---------- Word pack picker ----------
-const packSelect = document.getElementById('wordpack-select');
-const customBox = document.getElementById('custom-words-box');
-packSelect.addEventListener('change', () => customBox.classList.toggle('hidden', packSelect.value !== 'custom'));
-document.getElementById('save-wordpack-btn').addEventListener('click', () => {
-  const pack = packSelect.value;
-  const customWords = document.getElementById('custom-words-input').value.split(',').map(w => w.trim()).filter(Boolean);
-  socket.emit('set-word-pack', { pack, customWords });
-});
-socket.on('word-pack-update', ({ wordPack }) => setWordPackUI(wordPack));
-function setWordPackUI(pack) {
-  if (!pack) return;
-  packSelect.value = pack;
-  customBox.classList.toggle('hidden', pack !== 'custom');
 }
 
 // ---------- Typing indicator ----------
@@ -347,6 +355,8 @@ socket.on('round-end', ({ word, players, teams }) => {
 
 // ---------- Game end ----------
 socket.on('game-end', ({ players, bestDrawer, fastestGuesser, teamMode, teams }) => {
+  hideOverlay('roundend-overlay');
+  hideOverlay('choose-overlay');
   showScreen('screen-end');
   localStorage.removeItem('dd_room');
   const board = document.getElementById('final-scoreboard');

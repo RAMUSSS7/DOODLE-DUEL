@@ -336,3 +336,14 @@ body.theme-light .game-topbar, body.theme-light .sidebar, body.theme-light .chat
   .tool-group { flex-wrap: wrap; }
   .tool-btn { font-size: 18px; padding: 8px 10px; }
 }
+
+/* ---------- Settings screen ---------- */
+.settings-card { text-align: left; max-width: 420px; }
+.difficulty-options { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 4px; }
+.radio-pill {
+  display: flex; align-items: center; gap: 6px; background: #fffdf7; border: 2px solid #e3d8b8;
+  border-radius: 20px; padding: 6px 12px; font-size: 13px; font-weight: 700; cursor: pointer;
+}
+.radio-pill input { margin: 0; }
+.radio-pill:has(input:checked) { border-color: #ffcf4d; background: #fff8e0; }
+.settings-summary { font-size: 12px; color: #8a836c; text-align: center; margin: -6px 0 14px 0; }
