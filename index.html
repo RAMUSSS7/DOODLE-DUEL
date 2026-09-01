@@ -5,6 +5,10 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
 <title>Doodle Duel</title>
 <link rel="stylesheet" href="style.css">
+<link rel="manifest" href="/manifest.json">
+<link rel="icon" href="/icons/icon-192.png">
+<link rel="apple-touch-icon" href="/icons/apple-touch-icon.png">
+<meta name="theme-color" content="#1f3d38">
 </head>
 <body>
 
@@ -21,6 +25,7 @@
   <div id="menu-view-main" class="menu-view">
     <button class="menu-item" data-view="settings">⚙️ Settings</button>
     <button class="menu-item" data-view="stats">📊 My Stats</button>
+    <button class="menu-item" data-view="doodles">🖼 My Doodles</button>
     <button class="menu-item" data-view="howto">📖 How to Play</button>
     <button class="menu-item" data-view="about">ℹ️ About</button>
     <button id="menu-leave-room-btn" class="menu-item menu-item-danger hidden">🚪 Leave Room</button>
@@ -30,6 +35,7 @@
     <button class="menu-back-btn">← Back</button>
     <h3>Settings</h3>
     <label class="checkbox-row"><input type="checkbox" id="sound-toggle"> Sound effects</label>
+    <label class="checkbox-row"><input type="checkbox" id="brush-sound-toggle"> Brush sound while drawing</label>
     <label class="checkbox-row"><input type="checkbox" id="reduce-motion-toggle"> Reduce animations (no confetti)</label>
     <div class="theme-switch-row">
       <span>Theme</span>
@@ -42,6 +48,13 @@
     <h3>My Stats</h3>
     <p id="menu-level-line" class="level-badge">Lv.1 • 0 XP</p>
     <div id="achievements-grid" class="achievements-grid"></div>
+  </div>
+
+  <div id="menu-view-doodles" class="menu-view hidden">
+    <button class="menu-back-btn">← Back</button>
+    <h3>My Doodles</h3>
+    <p class="hint-text">Doodles you saved from Solo Play — stored on this device only.</p>
+    <div id="my-doodles-grid" class="my-doodles-grid"></div>
   </div>
 
   <div id="menu-view-howto" class="menu-view hidden">
@@ -191,6 +204,7 @@
   <div class="solo-action-row">
     <button id="solo-practice-reveal-btn" class="btn btn-secondary btn-small">👁 Reveal word</button>
     <button id="solo-practice-download-btn" class="btn btn-secondary btn-small">⬇ Download drawing</button>
+    <button id="solo-practice-save-btn" class="btn btn-secondary btn-small">💾 Save to My Doodles</button>
     <button id="solo-practice-next-btn" class="btn btn-primary btn-small">Next word</button>
     <button id="solo-practice-exit-btn" class="btn btn-text">← Exit</button>
   </div>
@@ -211,6 +225,7 @@
   <div class="board-frame lobby-card">
     <p class="eyebrow">Room code — share it with friends <span id="public-room-lobby-tag" class="public-tag hidden">🌍 Public</span></p>
     <div class="room-code-display" id="room-code-display">-----</div>
+    <button id="share-room-btn" class="btn btn-secondary btn-small">🔗 Share invite link</button>
 
     <div class="lobby-players">
       <h3>Players <span id="lobby-count">(0)</span></h3>
@@ -221,7 +236,7 @@
 
     <button id="start-game-btn" class="btn btn-primary">Start Game</button>
     <p id="lobby-hint" class="hint-text">Waiting for the host to start the game…</p>
-    <button id="leave-room-btn" class="btn btn-text">Leave room</button>
+    <p class="hint-text">Use the ☰ Menu to leave the room.</p>
   </div>
 </section>
 

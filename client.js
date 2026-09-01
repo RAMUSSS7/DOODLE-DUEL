@@ -34,12 +34,18 @@ document.getElementById('theme-toggle-inline').addEventListener('click', () => {
 
 // ---------- Sound & motion preferences ----------
 let soundEnabled = localStorage.getItem('dd_sound') !== 'off';
+let brushSoundEnabled = localStorage.getItem('dd_brush_sound') === 'on';
 let reduceMotion = localStorage.getItem('dd_reduce_motion') === 'on';
 document.getElementById('sound-toggle').checked = soundEnabled;
+document.getElementById('brush-sound-toggle').checked = brushSoundEnabled;
 document.getElementById('reduce-motion-toggle').checked = reduceMotion;
 document.getElementById('sound-toggle').addEventListener('change', e => {
   soundEnabled = e.target.checked;
   localStorage.setItem('dd_sound', soundEnabled ? 'on' : 'off');
+});
+document.getElementById('brush-sound-toggle').addEventListener('change', e => {
+  brushSoundEnabled = e.target.checked;
+  localStorage.setItem('dd_brush_sound', brushSoundEnabled ? 'on' : 'off');
 });
 document.getElementById('reduce-motion-toggle').addEventListener('change', e => {
   reduceMotion = e.target.checked;
@@ -66,6 +72,7 @@ function showMenuView(name) {
   document.querySelectorAll('.menu-view').forEach(v => v.classList.add('hidden'));
   document.getElementById('menu-view-' + name).classList.remove('hidden');
   if (name === 'stats') renderAchievementsGrid();
+  if (name === 'doodles') renderMyDoodlesGrid();
 }
 document.querySelectorAll('.menu-item[data-view]').forEach(btn => {
   btn.addEventListener('click', () => showMenuView(btn.dataset.view));
@@ -148,6 +155,57 @@ function renderAchievementsGrid() {
   });
 }
 
+// ---------- My Doodles gallery (saved locally in this browser) ----------
+const MAX_SAVED_DOODLES = 12;
+function getSavedDoodles() {
+  try { return JSON.parse(localStorage.getItem('dd_doodles') || '[]'); }
+  catch (e) { return []; }
+}
+function saveDoodle(canvas, word) {
+  const maxDim = 320;
+  const scale = Math.min(1, maxDim / Math.max(canvas.width, canvas.height));
+  const thumb = document.createElement('canvas');
+  thumb.width = Math.round(canvas.width * scale);
+  thumb.height = Math.round(canvas.height * scale);
+  thumb.getContext('2d').drawImage(canvas, 0, 0, thumb.width, thumb.height);
+  const dataUrl = thumb.toDataURL('image/png');
+
+  let list = getSavedDoodles();
+  list.unshift({ id: uuid(), dataUrl, word, date: Date.now() });
+  list = list.slice(0, MAX_SAVED_DOODLES);
+  try {
+    localStorage.setItem('dd_doodles', JSON.stringify(list));
+    showToast('💾 Saved to My Doodles');
+  } catch (e) {
+    showToast('⚠️ Could not save — storage full. Try deleting an old doodle.');
+  }
+}
+function deleteDoodle(id) {
+  const list = getSavedDoodles().filter(d => d.id !== id);
+  localStorage.setItem('dd_doodles', JSON.stringify(list));
+  renderMyDoodlesGrid();
+}
+function renderMyDoodlesGrid() {
+  const list = getSavedDoodles();
+  const grid = document.getElementById('my-doodles-grid');
+  grid.innerHTML = '';
+  if (!list.length) {
+    grid.innerHTML = '<p class="hint-text">No doodles saved yet — try Solo Play then "Save to My Doodles".</p>';
+    return;
+  }
+  list.forEach(d => {
+    const item = document.createElement('div');
+    item.className = 'doodle-thumb';
+    item.innerHTML = `
+      <img src="${d.dataUrl}" alt="${escapeHtml(d.word)}">
+      <div class="doodle-thumb-label">${escapeHtml(d.word)}</div>
+      <button class="doodle-thumb-delete" title="Delete">✕</button>
+    `;
+    item.querySelector('.doodle-thumb-delete').addEventListener('click', () => deleteDoodle(d.id));
+    grid.appendChild(item);
+  });
+}
+
 renderLevelBadge();
 
 // ---------- Home screen ----------
@@ -155,6 +213,14 @@ const nameInput = document.getElementById('name-input');
 const codeInput = document.getElementById('code-input');
 const homeError = document.getElementById('home-error');
 nameInput.value = savedName;
+
+// If someone opened a shared invite link like /?join=ABCDE, prefill the code.
+const urlParams = new URLSearchParams(location.search);
+const joinCodeFromUrl = urlParams.get('join');
+if (joinCodeFromUrl) {
+  codeInput.value = joinCodeFromUrl.toUpperCase();
+  history.replaceState(null, '', location.pathname);
+}
 
 document.getElementById('goto-settings-btn').addEventListener('click', () => {
   const name = nameInput.value.trim();
@@ -258,10 +324,22 @@ socket.on('room-joined', ({ code, hostToken: hT, players, wordPack, gameState, t
 });
 
 document.getElementById('start-game-btn').addEventListener('click', () => socket.emit('start-game'));
-document.getElementById('leave-room-btn').addEventListener('click', () => {
-  socket.emit('leave-room');
-  localStorage.removeItem('dd_room');
-  location.reload();
+
+document.getElementById('share-room-btn').addEventListener('click', async () => {
+  const code = localStorage.getItem('dd_room');
+  if (!code) return;
+  const url = `${location.origin}/?join=${code}`;
+  if (navigator.share) {
+    try { await navigator.share({ title: 'Join my Doodle Duel game!', text: `Join my Doodle Duel room with code ${code}`, url }); }
+    catch (e) { /* user cancelled share sheet, ignore */ }
+  } else {
+    try {
+      await navigator.clipboard.writeText(url);
+      showToast('🔗 Invite link copied!');
+    } catch (e) {
+      showToast(`Room code: ${code}`);
+    }
+  }
 });
 
 socket.on('back-to-lobby', ({ wordPack, teamMode, difficulty, speedRoundEnabled }) => {
@@ -621,6 +699,7 @@ function moveDraw(e) {
     localDraw(lastPoint, pos, color, currentSize);
     strokeHistory.push({ type: 'stroke', from: lastPoint, to: pos, color, size: currentSize });
     socket.emit('draw-data', { from: lastPoint, to: pos, color, size: currentSize });
+    playBrushSound();
     lastPoint = pos;
   } else {
     // live shape preview: redraw everything + preview shape
@@ -758,6 +837,22 @@ function playTick() {
     o.start(); g.gain.exponentialRampToValueAtTime(0.001, ctx2.currentTime + 0.08); o.stop(ctx2.currentTime + 0.08);
   } catch (e) {}
 }
+let lastBrushSoundPlayed = 0;
+function playBrushSound() {
+  if (!brushSoundEnabled) return;
+  const now = Date.now();
+  if (now - lastBrushSoundPlayed < 70) return;
+  lastBrushSoundPlayed = now;
+  try {
+    const ctx2 = getAudioCtx();
+    const o = ctx2.createOscillator(); const g = ctx2.createGain();
+    o.type = 'sawtooth';
+    o.frequency.value = 180 + Math.random() * 60;
+    g.gain.value = 0.02;
+    o.connect(g); g.connect(ctx2.destination);
+    o.start(); g.gain.exponentialRampToValueAtTime(0.001, ctx2.currentTime + 0.05); o.stop(ctx2.currentTime + 0.05);
+  } catch (e) {}
+}
 
 // =====================================================================
 // SOLO PLAY MODE — no server room needed, everything runs in the browser.
@@ -887,6 +982,7 @@ function setupDrawingCanvas(ids) {
       const color = state.erasing ? '#faf3e2' : state.color;
       localDraw(state.lastPoint, pos, color, state.size);
       state.history.push({ type: 'stroke', from: state.lastPoint, to: pos, color, size: state.size });
+      playBrushSound();
       state.lastPoint = pos;
     } else {
       redrawAll();
@@ -980,6 +1076,9 @@ document.getElementById('solo-practice-download-btn').addEventListener('click', 
   a.download = `doodle-${soloPracticeWord.word}.png`;
   a.click();
 });
+document.getElementById('solo-practice-save-btn').addEventListener('click', () => {
+  saveDoodle(soloPracticeEditor.canvas, soloPracticeWord.word);
+});
 document.getElementById('solo-practice-next-btn').addEventListener('click', () => {
   clearInterval(soloPracticeTimer);
   const { pack, diff } = currentSoloPackDiff();
@@ -989,3 +1088,10 @@ document.getElementById('solo-practice-exit-btn').addEventListener('click', () =
   clearInterval(soloPracticeTimer);
   showScreen('screen-solo-hub');
 });
+
+// ---------- PWA: register service worker ----------
+if ('serviceWorker' in navigator) {
+  window.addEventListener('load', () => {
+    navigator.serviceWorker.register('/service-worker.js').catch(() => {});
+  });
+}

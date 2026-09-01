@@ -38,7 +38,12 @@ that way both locally and in your GitHub repo, or the server won't find them.
 - Confetti + a little win jingle on the final results screen
 - **Solo Play** (no room needed): Draw Practice — pick a word pack and
   difficulty, sketch freely with the pen/shapes/fill/undo tools, no timer
-  pressure, no one guessing. Reveal the word or download your doodle anytime.
+  pressure, no one guessing. Reveal the word, download your doodle, or save
+  it to **My Doodles** (a personal gallery kept in this browser)
+- Installable as a **PWA** — "Add to Home Screen" on phones for an app-like icon
+- One-tap **Share invite link** from the lobby (uses the native share sheet
+  on phones, copies the link on desktop)
+- Optional **brush sound** while drawing (off by default, toggle in Settings)
 
 ## Run it locally
 ```bash
