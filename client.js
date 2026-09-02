@@ -1095,3 +1095,243 @@ if ('serviceWorker' in navigator) {
     navigator.serviceWorker.register('/service-worker.js').catch(() => {});
   });
 }
+
+// =====================================================================
+// ACCOUNTS & FRIENDS
+// =====================================================================
+let authToken = localStorage.getItem('dd_auth_token');
+let currentUser = null; // { id, username, friendCode }
+let authMode = 'login';
+let currentDmFriend = null; // { id, username }
+
+function apiPost(path, body) {
+  return fetch(path, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(body)
+  }).then(async res => {
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) throw new Error(data.error || 'Something went wrong.');
+    return data;
+  });
+}
+
+function setLoggedInUI(user) {
+  currentUser = user;
+  document.getElementById('goto-auth-btn').classList.add('hidden');
+  document.getElementById('account-logged-in').classList.remove('hidden');
+  document.getElementById('account-username-label').textContent = user.username;
+  document.getElementById('my-friend-code').textContent = user.friendCode;
+  if (!nameInput.value.trim()) nameInput.value = user.username;
+}
+function setLoggedOutUI() {
+  currentUser = null;
+  document.getElementById('goto-auth-btn').classList.remove('hidden');
+  document.getElementById('account-logged-in').classList.add('hidden');
+  document.getElementById('friends-badge').classList.add('hidden');
+}
+
+if (authToken) socket.emit('friends:auth', { token: authToken });
+socket.on('connect', () => { if (authToken) socket.emit('friends:auth', { token: authToken }); });
+
+socket.on('friends:auth-ok', user => {
+  setLoggedInUI(user);
+  socket.emit('friends:get-list');
+});
+socket.on('friends:auth-error', () => {
+  localStorage.removeItem('dd_auth_token');
+  authToken = null;
+  setLoggedOutUI();
+});
+
+document.getElementById('goto-auth-btn').addEventListener('click', () => showScreen('screen-auth'));
+document.getElementById('auth-back-btn').addEventListener('click', () => showScreen('screen-home'));
+document.getElementById('auth-toggle-btn').addEventListener('click', () => {
+  authMode = authMode === 'login' ? 'signup' : 'login';
+  document.getElementById('auth-heading').textContent = authMode === 'login' ? 'Log in' : 'Create an account';
+  document.getElementById('auth-submit-btn').textContent = authMode === 'login' ? 'Log in' : 'Sign up';
+  document.getElementById('auth-toggle-btn').textContent = authMode === 'login'
+    ? "Don't have an account? Sign up"
+    : 'Already have an account? Log in';
+  document.getElementById('auth-error').textContent = '';
+});
+document.getElementById('auth-submit-btn').addEventListener('click', async () => {
+  const username = document.getElementById('auth-username').value.trim();
+  const password = document.getElementById('auth-password').value;
+  const errEl = document.getElementById('auth-error');
+  errEl.textContent = '';
+  if (!username || !password) { errEl.textContent = 'Fill in both fields.'; return; }
+  try {
+    const data = await apiPost(authMode === 'login' ? '/api/login' : '/api/signup', { username, password });
+    authToken = data.token;
+    localStorage.setItem('dd_auth_token', authToken);
+    socket.emit('friends:auth', { token: authToken });
+    document.getElementById('auth-username').value = '';
+    document.getElementById('auth-password').value = '';
+    showScreen('screen-home');
+  } catch (e) {
+    errEl.textContent = e.message;
+  }
+});
+document.getElementById('logout-btn').addEventListener('click', () => {
+  localStorage.removeItem('dd_auth_token');
+  location.reload();
+});
+
+// ---------- Friends hub ----------
+document.getElementById('goto-friends-btn').addEventListener('click', () => {
+  showScreen('screen-friends');
+  socket.emit('friends:get-list');
+});
+document.getElementById('friends-back-btn').addEventListener('click', () => showScreen('screen-home'));
+document.getElementById('copy-friend-code-btn').addEventListener('click', async () => {
+  if (!currentUser) return;
+  try { await navigator.clipboard.writeText(currentUser.friendCode); showToast('📋 Friend code copied!'); }
+  catch (e) { showToast(`Your code: ${currentUser.friendCode}`); }
+});
+document.getElementById('add-friend-btn').addEventListener('click', () => {
+  const code = document.getElementById('add-friend-input').value.trim().toUpperCase();
+  document.getElementById('friends-error').textContent = '';
+  if (!code) return;
+  socket.emit('friends:send-request', { friendCode: code });
+});
+socket.on('friends:request-sent', ({ username }) => {
+  document.getElementById('add-friend-input').value = '';
+  showToast(`✅ Friend request sent to ${username}`);
+});
+socket.on('friends:error', ({ message }) => {
+  const errEl = document.getElementById('friends-error');
+  if (document.getElementById('screen-friends').classList.contains('active')) errEl.textContent = message;
+  else showToast('⚠️ ' + message);
+});
+socket.on('friends:incoming-request', () => {
+  socket.emit('friends:get-list');
+  showToast('👋 New friend request received!');
+});
+socket.on('friends:request-accepted', ({ byUsername }) => {
+  socket.emit('friends:get-list');
+  showToast(`🎉 ${byUsername} accepted your friend request!`);
+});
+
+socket.on('friends:list', ({ friends, incoming }) => {
+  const badge = document.getElementById('friends-badge');
+  if (incoming.length) { badge.textContent = incoming.length; badge.classList.remove('hidden'); }
+  else badge.classList.add('hidden');
+
+  const reqBox = document.getElementById('incoming-requests-box');
+  const reqList = document.getElementById('incoming-requests-list');
+  reqList.innerHTML = '';
+  if (incoming.length) {
+    reqBox.classList.remove('hidden');
+    incoming.forEach(r => {
+      const li = document.createElement('li');
+      li.innerHTML = `<span class="p-name">${escapeHtml(r.from_username || r.fromUsername || r.username)}</span>`;
+      const actions = document.createElement('span');
+      actions.className = 'request-actions';
+      const acceptBtn = document.createElement('button');
+      acceptBtn.className = 'btn-accept'; acceptBtn.textContent = 'Accept';
+      acceptBtn.addEventListener('click', () => socket.emit('friends:respond', { fromUserId: r.from_user_id ?? r.fromUserId, accept: true }));
+      const declineBtn = document.createElement('button');
+      declineBtn.className = 'btn-decline'; declineBtn.textContent = 'Decline';
+      declineBtn.addEventListener('click', () => socket.emit('friends:respond', { fromUserId: r.from_user_id ?? r.fromUserId, accept: false }));
+      actions.appendChild(acceptBtn); actions.appendChild(declineBtn);
+      li.appendChild(actions);
+      reqList.appendChild(li);
+    });
+  } else {
+    reqBox.classList.add('hidden');
+  }
+
+  const list = document.getElementById('friends-list');
+  list.innerHTML = '';
+  if (!friends.length) {
+    list.innerHTML = '<li class="hint-text" style="border:none;background:none;">No friends yet — add one with their friend code above.</li>';
+    return;
+  }
+  friends.forEach(f => {
+    const li = document.createElement('li');
+    const dot = `<span class="online-dot${f.online ? ' online' : ''}"></span>`;
+    li.innerHTML = `<span class="p-name">${dot}${escapeHtml(f.username)}</span>`;
+    const actions = document.createElement('span');
+    actions.className = 'friend-actions';
+    const chatBtn = document.createElement('button');
+    chatBtn.className = 'btn-chat'; chatBtn.textContent = '💬 Chat';
+    chatBtn.addEventListener('click', () => openDmWith(f));
+    actions.appendChild(chatBtn);
+    if (f.online) {
+      const inviteBtn = document.createElement('button');
+      inviteBtn.className = 'btn-invite'; inviteBtn.textContent = '🎮 Invite';
+      inviteBtn.addEventListener('click', () => socket.emit('friends:invite', { friendUserId: f.id }));
+      actions.appendChild(inviteBtn);
+    }
+    li.appendChild(actions);
+    list.appendChild(li);
+  });
+});
+
+socket.on('friends:invite-created', () => showToast('🎮 Invite sent!'));
+
+// ---------- DM chat ----------
+function openDmWith(friend) {
+  currentDmFriend = friend;
+  document.getElementById('dm-heading').textContent = `Chat with ${friend.username}`;
+  document.getElementById('dm-log').innerHTML = '';
+  showScreen('screen-dm');
+  socket.emit('friends:dm-history', { withUserId: friend.id });
+}
+document.getElementById('dm-back-btn').addEventListener('click', () => showScreen('screen-friends'));
+document.getElementById('dm-invite-btn').addEventListener('click', () => {
+  if (currentDmFriend) socket.emit('friends:invite', { friendUserId: currentDmFriend.id });
+});
+document.getElementById('dm-form').addEventListener('submit', e => {
+  e.preventDefault();
+  const input = document.getElementById('dm-input');
+  const text = input.value.trim();
+  if (!text || !currentDmFriend) return;
+  socket.emit('friends:dm-send', { toUserId: currentDmFriend.id, text });
+  input.value = '';
+});
+function addDmMessage(text, mine) {
+  const div = document.createElement('div');
+  div.className = 'msg' + (mine ? ' mine' : '');
+  div.textContent = text;
+  const log = document.getElementById('dm-log');
+  log.appendChild(div);
+  log.scrollTop = log.scrollHeight;
+}
+socket.on('friends:dm-history', ({ withUserId, messages }) => {
+  if (!currentDmFriend || withUserId !== currentDmFriend.id) return;
+  document.getElementById('dm-log').innerHTML = '';
+  messages.forEach(m => addDmMessage(m.text, m.fromUserId === (currentUser && currentUser.id)));
+});
+socket.on('friends:dm-sent', payload => {
+  if (currentDmFriend && document.getElementById('screen-dm').classList.contains('active')) addDmMessage(payload.text, true);
+});
+socket.on('friends:dm-received', payload => {
+  if (currentDmFriend && payload.fromUserId === currentDmFriend.id && document.getElementById('screen-dm').classList.contains('active')) {
+    addDmMessage(payload.text, false);
+  } else {
+    showToast(`💬 New message from ${payload.fromUsername}`);
+  }
+});
+
+// ---------- Incoming game invite ----------
+let pendingInviteCode = null;
+socket.on('friends:invite-received', ({ fromUsername, code }) => {
+  pendingInviteCode = code;
+  document.getElementById('invite-toast-text').textContent = `🎮 ${fromUsername} invited you to play!`;
+  document.getElementById('invite-toast').classList.remove('hidden');
+});
+document.getElementById('invite-toast-dismiss-btn').addEventListener('click', () => {
+  document.getElementById('invite-toast').classList.add('hidden');
+});
+document.getElementById('invite-toast-join-btn').addEventListener('click', () => {
+  if (!pendingInviteCode) return;
+  document.getElementById('invite-toast').classList.add('hidden');
+  showScreen('screen-home');
+  codeInput.value = pendingInviteCode;
+  const name = nameInput.value.trim() || (currentUser ? currentUser.username : 'Player');
+  localStorage.setItem('dd_name', name);
+  socket.emit('join-room', { name, code: pendingInviteCode, token: myToken });
+  pendingInviteCode = null;
+});

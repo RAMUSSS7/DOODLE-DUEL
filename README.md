@@ -2,22 +2,28 @@
 
 A real-time multiplayer party game: one player draws, everyone else races to
 guess the word in the chat. Built with **Node.js + Express + Socket.io** on
-the server and plain **HTML/CSS/JS (Canvas)** on the client — no build step,
-no framework needed.
+the server, **PostgreSQL** for accounts/friends, and plain **HTML/CSS/JS
+(Canvas)** on the client — no build step, no frontend framework needed.
 
 ## What's inside
 ```
 doodle-duel/
-├── server.js         # game server: rooms, rounds, scoring, drawing relay, reconnect
+├── server.js         # game server + accounts/friends REST & socket API
+├── db.js             # PostgreSQL connection + schema setup
 ├── package.json
-├── index.html        # all screens (home, lobby, game, results)
+├── index.html        # all screens (home, lobby, game, friends, results…)
 ├── style.css         # chalkboard / paper visual theme
-└── client.js         # socket handling + canvas drawing
+├── client.js         # socket handling, canvas drawing, accounts UI
+├── manifest.json      # PWA manifest
+├── service-worker.js  # PWA offline app-shell caching
+└── icons/              # PWA icons
 ```
 All files live at the root of the project (no `public/` subfolder) — keep it
 that way both locally and in your GitHub repo, or the server won't find them.
 
 ## Features
+
+### Core game
 - Rooms with a 5-letter code, 2–8 players
 - Pre-room settings screen: host picks word pack, difficulty, speed round, and
   team mode **before** the room is even created
@@ -33,25 +39,67 @@ that way both locally and in your GitHub repo, or the server won't find them.
 - Typing indicator, dark/light theme, sound & animation toggles
 - Automatic reconnect: if a player's connection drops, they keep their seat,
   score, and streak for 2 minutes and resume exactly where the game left off
-- A slide-out menu with Settings, My Stats (level/XP + achievements),
-  How to Play, and About
+- A slide-out menu with Settings, My Stats (level/XP + achievements), My
+  Doodles, How to Play, and About
 - Confetti + a little win jingle on the final results screen
 - **Solo Play** (no room needed): Draw Practice — pick a word pack and
-  difficulty, sketch freely with the pen/shapes/fill/undo tools, no timer
-  pressure, no one guessing. Reveal the word, download your doodle, or save
-  it to **My Doodles** (a personal gallery kept in this browser)
-- Installable as a **PWA** — "Add to Home Screen" on phones for an app-like icon
-- One-tap **Share invite link** from the lobby (uses the native share sheet
-  on phones, copies the link on desktop)
-- Optional **brush sound** while drawing (off by default, toggle in Settings)
+  difficulty, sketch freely, no timer pressure, no one guessing. Reveal the
+  word, download your doodle, or save it to **My Doodles**
+- Installable as a **PWA** — "Add to Home Screen" on phones
+- One-tap **Share invite link** from the lobby
+- Optional **brush sound** while drawing (off by default)
+
+### Accounts & Friends (needs a database — see setup below)
+- Sign up / log in with a username + password
+- Every account gets a permanent, unique **friend code** to share
+- Send/accept/decline friend requests by friend code
+- Friends list with live online/offline status
+- **Direct messages** between friends, independent of any game room
+- **Invite a friend straight to a room** — no need to copy/paste a link;
+  they get an in-app notification with a one-tap Join button
 
 ## Run it locally
+
+You need a PostgreSQL database for the accounts/friends features (the core
+game itself works fine without one — those features simply won't respond
+if the database can't connect).
+
 ```bash
 npm install
+
+# Point the server at a Postgres database:
+export DATABASE_URL="postgres://user:password@host:5432/dbname"
+
 npm start
 ```
+
+If `DATABASE_URL` isn't set, it falls back to
+`postgres://postgres:devpass123@localhost:5432/doodleduel_dev` for local
+development with a Postgres server running on your own machine.
+
 Then open **http://localhost:3000** in two different browser tabs (or two
 devices on the same network) to test with more than one player.
+
+## Setting up a real (free) database for deployment
+
+Render's own free PostgreSQL is time-limited, so a standalone free Postgres
+host is more reliable long-term. Either of these works well and stays free
+for a small project like this:
+
+### Option 1 — Neon (neon.tech)
+1. Sign up at neon.tech, create a new project.
+2. Copy the **connection string** it gives you (starts with `postgres://`).
+3. That's your `DATABASE_URL`.
+
+### Option 2 — Supabase (supabase.com)
+1. Sign up, create a new project.
+2. Go to Project Settings → Database → Connection string (URI format).
+3. That's your `DATABASE_URL`.
+
+Either way, the very first time the server starts with a valid
+`DATABASE_URL`, it automatically creates all the tables it needs
+(`users`, `sessions`, `friend_requests`, `friendships`, `messages`) — no
+manual SQL required.
 
 ## How the game works
 - A host creates a room and gets a 5-letter code to share.
@@ -66,36 +114,32 @@ devices on the same network) to test with more than one player.
   final scores are shown and the host can start a new game.
 
 You can tune the round length, rounds per player, and word list at the top
-of `server.js` (`ROUND_SECONDS`, `ROUNDS_PER_PLAYER`, `WORDS`).
+of `server.js` (`ROUND_SECONDS`, `ROUNDS_PER_PLAYER`, `WORD_PACKS`).
 
 ## Deploying so people can actually play online
 
 This game needs a server that stays running (it's not a static file you can
-just drop into CrazyGames on its own). The easiest free options:
+just drop into CrazyGames on its own).
 
-### Option A — Render.com (recommended, easiest)
+### Render.com (recommended, easiest)
 1. Push this folder to a GitHub repo.
 2. On [render.com](https://render.com), click **New → Web Service**, connect
    the repo.
 3. Build command: `npm install`. Start command: `node server.js`.
-4. Deploy. You'll get a URL like `https://doodle-duel.onrender.com`.
-5. Note: Render's free tier "sleeps" after inactivity, so the first player
+4. In the service's **Environment** tab, add an environment variable:
+   `DATABASE_URL` = the connection string from Neon or Supabase (see above).
+5. Deploy. You'll get a URL like `https://doodle-duel.onrender.com`.
+6. Note: Render's free tier "sleeps" after inactivity, so the first player
    to open the game after a while will see a ~30-second cold start. Fine for
    testing; consider a paid tier if the game gets real traffic.
-
-### Option B — Railway.app or Glitch.com
-Same idea — both can run a Node + Socket.io server directly from a repo or
-zip upload, and Glitch in particular is very quick for this kind of
-real-time app if you want zero config.
 
 ## Connecting this to CrazyGames
 
 CrazyGames hosts your **client** (the HTML5 files), but it can't run your
 **server** for you — your multiplayer server has to live somewhere like
-Render (Option A above). The client just needs to know where to connect:
+Render (above). The client just needs to know where to connect:
 
-1. Deploy `server.js` (Option A/B) and note your server's URL, e.g.
-   `https://doodle-duel.onrender.com`.
+1. Deploy the server and note its URL, e.g. `https://doodle-duel.onrender.com`.
 2. In `client.js`, change the very first line from:
    ```js
    const socket = io();
@@ -104,9 +148,10 @@ Render (Option A above). The client just needs to know where to connect:
    ```js
    const socket = io('https://doodle-duel.onrender.com');
    ```
-3. Zip `index.html`, `style.css`, and `client.js` together — at the root of
-   the zip, not inside a folder — and upload that zip as your CrazyGames
-   HTML5 build. `index.html` must be at the root of the zip.
+3. Zip `index.html`, `style.css`, `client.js`, `manifest.json`,
+   `service-worker.js`, and the `icons/` folder together — at the root of
+   the zip, not inside a folder — and upload that as your CrazyGames HTML5
+   build. `index.html` must be at the root of the zip.
 4. In `server.js`, tighten the CORS setting before going live so random
    sites can't connect to your server:
    ```js
@@ -119,7 +164,8 @@ That's it — CrazyGames serves the page, and the page talks to your Render
 server over WebSockets for all the real-time gameplay.
 
 ## Ideas for extending it
-- Add more/localized word lists (e.g. an Arabic word pack).
-- Private rooms with a max player limit shown in the lobby.
-- A "custom words" mode where the host pastes their own word list.
-- Emoji reactions players can throw while someone's drawing.
+- Push notifications for friend requests / invites when the app is closed
+  (needs the Web Push API + storing subscription info per user).
+- Group chat rooms for a friend group, not just 1-on-1 DMs.
+- A "Recently played with" list to quickly re-invite past teammates.
+- Profile pictures/avatars (would need file upload + storage, e.g. S3).

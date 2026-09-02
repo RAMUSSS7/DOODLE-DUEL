@@ -1,9 +1,13 @@
 const express = require('express');
 const http = require('http');
 const { Server } = require('socket.io');
+const bcrypt = require('bcryptjs');
+const crypto = require('crypto');
+const { pool, initSchema } = require('./db');
 
 const app = express();
 const server = http.createServer(app);
+app.use(express.json());
 
 // NOTE: origin is wide open here for easy testing/deployment.
 // Before shipping publicly, restrict this to your CrazyGames game URL.
@@ -14,6 +18,92 @@ const io = new Server(server, {
 app.use(express.static(__dirname));
 app.get('/api/words', (req, res) => {
   res.json(WORD_PACKS);
+});
+
+// ---------------- Accounts / Friends REST API ----------------
+const FRIEND_CODE_CHARS = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789'; // no 0/O/1/I to avoid confusion
+function makeFriendCode() {
+  return Array.from({ length: 6 }, () => FRIEND_CODE_CHARS[Math.floor(Math.random() * FRIEND_CODE_CHARS.length)]).join('');
+}
+async function uniqueFriendCode() {
+  for (let i = 0; i < 20; i++) {
+    const code = makeFriendCode();
+    const { rows } = await pool.query('SELECT 1 FROM users WHERE friend_code = $1', [code]);
+    if (!rows.length) return code;
+  }
+  throw new Error('Could not generate a unique friend code');
+}
+function makeSessionToken() {
+  return crypto.randomBytes(24).toString('hex');
+}
+function validUsername(u) {
+  return typeof u === 'string' && /^[a-zA-Z0-9_]{3,16}$/.test(u);
+}
+
+app.post('/api/signup', async (req, res) => {
+  try {
+    const { username, password } = req.body || {};
+    if (!validUsername(username)) return res.status(400).json({ error: 'Username must be 3-16 letters, numbers, or underscores.' });
+    if (typeof password !== 'string' || password.length < 6) return res.status(400).json({ error: 'Password must be at least 6 characters.' });
+
+    const existing = await pool.query('SELECT 1 FROM users WHERE username = $1', [username]);
+    if (existing.rows.length) return res.status(409).json({ error: 'That username is already taken.' });
+
+    const passwordHash = await bcrypt.hash(password, 10);
+    const friendCode = await uniqueFriendCode();
+    const result = await pool.query(
+      'INSERT INTO users (username, password_hash, friend_code) VALUES ($1, $2, $3) RETURNING id, username, friend_code',
+      [username, passwordHash, friendCode]
+    );
+    const user = result.rows[0];
+    const token = makeSessionToken();
+    await pool.query('INSERT INTO sessions (token, user_id) VALUES ($1, $2)', [token, user.id]);
+    res.json({ token, userId: user.id, username: user.username, friendCode: user.friend_code });
+  } catch (err) {
+    console.error('signup error', err);
+    res.status(500).json({ error: 'Something went wrong creating your account.' });
+  }
+});
+
+app.post('/api/login', async (req, res) => {
+  try {
+    const { username, password } = req.body || {};
+    if (!username || !password) return res.status(400).json({ error: 'Username and password are required.' });
+    const result = await pool.query('SELECT id, username, password_hash, friend_code FROM users WHERE username = $1', [username]);
+    const user = result.rows[0];
+    if (!user) return res.status(401).json({ error: 'Incorrect username or password.' });
+    const ok = await bcrypt.compare(password, user.password_hash);
+    if (!ok) return res.status(401).json({ error: 'Incorrect username or password.' });
+    const token = makeSessionToken();
+    await pool.query('INSERT INTO sessions (token, user_id) VALUES ($1, $2)', [token, user.id]);
+    res.json({ token, userId: user.id, username: user.username, friendCode: user.friend_code });
+  } catch (err) {
+    console.error('login error', err);
+    res.status(500).json({ error: 'Something went wrong logging you in.' });
+  }
+});
+
+async function getUserByToken(token) {
+  if (!token) return null;
+  const result = await pool.query(
+    `SELECT u.id, u.username, u.friend_code FROM sessions s
+     JOIN users u ON u.id = s.user_id WHERE s.token = $1`,
+    [token]
+  );
+  return result.rows[0] || null;
+}
+
+app.get('/api/me', async (req, res) => {
+  const token = req.query.token;
+  const user = await getUserByToken(token);
+  if (!user) return res.status(401).json({ error: 'Not logged in.' });
+  res.json({ userId: user.id, username: user.username, friendCode: user.friend_code });
+});
+
+app.post('/api/logout', async (req, res) => {
+  const { token } = req.body || {};
+  if (token) await pool.query('DELETE FROM sessions WHERE token = $1', [token]);
+  res.json({ ok: true });
 });
 
 const PORT = process.env.PORT || 3000;
@@ -342,7 +432,176 @@ function publicRoomsList() {
     });
 }
 
+// ---------------- Friends: presence tracking ----------------
+// userId (number) -> Set of socket.id currently connected for that account
+const onlineSockets = new Map();
+function markOnline(userId, socketId) {
+  if (!onlineSockets.has(userId)) onlineSockets.set(userId, new Set());
+  onlineSockets.get(userId).add(socketId);
+}
+function markOffline(userId, socketId) {
+  const set = onlineSockets.get(userId);
+  if (!set) return;
+  set.delete(socketId);
+  if (!set.size) onlineSockets.delete(userId);
+}
+function isOnline(userId) { return onlineSockets.has(userId); }
+function emitToUser(userId, event, payload) {
+  const set = onlineSockets.get(userId);
+  if (!set) return;
+  set.forEach(sid => io.to(sid).emit(event, payload));
+}
+
 io.on('connection', socket => {
+  // ---------------- Friends: auth + presence ----------------
+  socket.on('friends:auth', async ({ token }) => {
+    const user = await getUserByToken(token);
+    if (!user) return socket.emit('friends:auth-error', { message: 'Session expired, please log in again.' });
+    socket.data.userId = user.id;
+    socket.data.username = user.username;
+    markOnline(user.id, socket.id);
+    socket.emit('friends:auth-ok', { userId: user.id, username: user.username, friendCode: user.friend_code });
+  });
+
+  socket.on('friends:send-request', async ({ friendCode }) => {
+    const me = socket.data.userId;
+    if (!me) return socket.emit('friends:error', { message: 'Please log in first.' });
+    try {
+      const codeUpper = String(friendCode || '').trim().toUpperCase();
+      const target = await pool.query('SELECT id, username FROM users WHERE friend_code = $1', [codeUpper]);
+      if (!target.rows.length) return socket.emit('friends:error', { message: 'No account found with that friend code.' });
+      const targetId = target.rows[0].id;
+      if (targetId === me) return socket.emit('friends:error', { message: "That's your own friend code!" });
+
+      const already = await pool.query(
+        `SELECT 1 FROM friendships WHERE (user_id_a=$1 AND user_id_b=$2) OR (user_id_a=$2 AND user_id_b=$1)`,
+        [me, targetId]
+      );
+      if (already.rows.length) return socket.emit('friends:error', { message: 'You are already friends.' });
+
+      await pool.query(
+        `INSERT INTO friend_requests (from_user_id, to_user_id, status)
+         VALUES ($1, $2, 'pending')
+         ON CONFLICT (from_user_id, to_user_id) DO UPDATE SET status='pending', created_at=now()`,
+        [me, targetId]
+      );
+      socket.emit('friends:request-sent', { username: target.rows[0].username });
+      emitToUser(targetId, 'friends:incoming-request', { fromUserId: me, fromUsername: socket.data.username });
+    } catch (err) {
+      console.error('send-request error', err);
+      socket.emit('friends:error', { message: 'Could not send friend request.' });
+    }
+  });
+
+  socket.on('friends:respond', async ({ fromUserId, accept }) => {
+    const me = socket.data.userId;
+    if (!me) return;
+    try {
+      const reqRow = await pool.query(
+        `SELECT id FROM friend_requests WHERE from_user_id=$1 AND to_user_id=$2 AND status='pending'`,
+        [fromUserId, me]
+      );
+      if (!reqRow.rows.length) return;
+      if (accept) {
+        await pool.query(`UPDATE friend_requests SET status='accepted' WHERE id=$1`, [reqRow.rows[0].id]);
+        const a = Math.min(me, fromUserId), b = Math.max(me, fromUserId);
+        await pool.query(
+          `INSERT INTO friendships (user_id_a, user_id_b) VALUES ($1,$2) ON CONFLICT DO NOTHING`,
+          [a, b]
+        );
+        const meRow = await pool.query('SELECT username FROM users WHERE id=$1', [me]);
+        emitToUser(fromUserId, 'friends:request-accepted', { byUserId: me, byUsername: meRow.rows[0].username });
+      } else {
+        await pool.query(`UPDATE friend_requests SET status='declined' WHERE id=$1`, [reqRow.rows[0].id]);
+      }
+      pushFriendsList(me);
+    } catch (err) {
+      console.error('respond error', err);
+    }
+  });
+
+  async function pushFriendsList(userId) {
+    try {
+      const friendsQ = await pool.query(
+        `SELECT u.id, u.username FROM friendships f
+         JOIN users u ON u.id = (CASE WHEN f.user_id_a = $1 THEN f.user_id_b ELSE f.user_id_a END)
+         WHERE f.user_id_a = $1 OR f.user_id_b = $1
+         ORDER BY u.username`,
+        [userId]
+      );
+      const friends = friendsQ.rows.map(r => ({ id: r.id, username: r.username, online: isOnline(r.id) }));
+
+      const incomingQ = await pool.query(
+        `SELECT fr.from_user_id, u.username FROM friend_requests fr
+         JOIN users u ON u.id = fr.from_user_id
+         WHERE fr.to_user_id = $1 AND fr.status = 'pending'`,
+        [userId]
+      );
+      const incoming = incomingQ.rows.map(r => ({ fromUserId: r.from_user_id, fromUsername: r.username }));
+
+      emitToUser(userId, 'friends:list', { friends, incoming });
+    } catch (err) {
+      console.error('pushFriendsList error', err);
+    }
+  }
+  socket.on('friends:get-list', () => { if (socket.data.userId) pushFriendsList(socket.data.userId); });
+
+  socket.on('friends:invite', ({ friendUserId }) => {
+    const me = socket.data.userId;
+    if (!me) return;
+    if (!isOnline(friendUserId)) return socket.emit('friends:error', { message: 'Your friend is not online right now.' });
+
+    const code = makeRoomCode();
+    const room = {
+      code, players: [], hostToken: 'user-' + me, state: 'lobby', currentDrawerIndex: -1,
+      currentWord: null, maskedWord: null, roundNumber: 0, totalRounds: 0, timer: null, timeLeft: 0,
+      wordOptions: [], drawingHistory: [], groupCounter: 0, currentGroupId: null, hintsSent: 0,
+      wordPack: 'english', customWords: [], usedWords: new Set(), firstGuesserToken: null,
+      isPublic: false, teamMode: false, speedRoundEnabled: true, speedRoundDone: false, isSpeedRound: false,
+      difficultyFilter: 'mixed'
+    };
+    rooms[code] = room;
+    socket.emit('friends:invite-created', { code });
+    emitToUser(friendUserId, 'friends:invite-received', { fromUsername: socket.data.username, code });
+  });
+
+  socket.on('friends:dm-send', async ({ toUserId, text }) => {
+    const me = socket.data.userId;
+    if (!me || !text || !text.trim()) return;
+    const clean = text.trim().slice(0, 500);
+    try {
+      const result = await pool.query(
+        'INSERT INTO messages (from_user_id, to_user_id, text) VALUES ($1,$2,$3) RETURNING id, created_at',
+        [me, toUserId, clean]
+      );
+      const payload = { id: result.rows[0].id, fromUserId: me, fromUsername: socket.data.username, text: clean, ts: result.rows[0].created_at };
+      socket.emit('friends:dm-sent', payload);
+      emitToUser(toUserId, 'friends:dm-received', payload);
+    } catch (err) {
+      console.error('dm-send error', err);
+    }
+  });
+
+  socket.on('friends:dm-history', async ({ withUserId }) => {
+    const me = socket.data.userId;
+    if (!me) return;
+    try {
+      const result = await pool.query(
+        `SELECT id, from_user_id, to_user_id, text, created_at FROM messages
+         WHERE (from_user_id=$1 AND to_user_id=$2) OR (from_user_id=$2 AND to_user_id=$1)
+         ORDER BY created_at ASC LIMIT 200`,
+        [me, withUserId]
+      );
+      socket.emit('friends:dm-history', { withUserId, messages: result.rows });
+    } catch (err) {
+      console.error('dm-history error', err);
+    }
+  });
+
+  socket.on('disconnect', () => {
+    if (socket.data.userId) markOffline(socket.data.userId, socket.id);
+  });
+
   socket.on('create-room', ({ name, token, isPublic, wordPack, customWords, difficulty, speedRoundEnabled, teamMode }) => {
     const code = makeRoomCode();
     const room = {
@@ -602,6 +861,13 @@ io.on('connection', socket => {
   }
 });
 
-server.listen(PORT, () => {
-  console.log(`Doodle Duel server running on port ${PORT}`);
-});
+initSchema()
+  .then(() => {
+    server.listen(PORT, () => {
+      console.log(`Doodle Duel server running on port ${PORT}`);
+    });
+  })
+  .catch(err => {
+    console.error('Failed to initialize database schema:', err);
+    process.exit(1);
+  });

@@ -86,6 +86,15 @@
     <p id="level-badge" class="level-badge">Lv.1 • 0 XP</p>
     <p id="reconnect-msg" class="hint-text hidden">Reconnecting to your last game…</p>
 
+    <div id="account-bar" class="account-bar">
+      <button id="goto-auth-btn" class="btn btn-text">🔑 Log in / Sign up</button>
+      <div id="account-logged-in" class="hidden">
+        <span id="account-username-label" class="account-username"></span>
+        <button id="goto-friends-btn" class="btn btn-text">👥 Friends <span id="friends-badge" class="friends-badge hidden">0</span></button>
+        <button id="logout-btn" class="btn btn-text">Log out</button>
+      </div>
+    </div>
+
     <div class="field">
       <label for="name-input">Your name</label>
       <input id="name-input" maxlength="16" placeholder="e.g. Amine" autocomplete="off">
@@ -106,6 +115,80 @@
     <p id="home-error" class="error-text"></p>
   </div>
 </section>
+
+<!-- LOGIN / SIGNUP -->
+<section id="screen-auth" class="screen">
+  <div class="board-frame settings-card">
+    <p class="eyebrow" id="auth-heading">Log in</p>
+
+    <div class="field">
+      <label for="auth-username">Username</label>
+      <input id="auth-username" maxlength="16" placeholder="3-16 letters, numbers, _" autocomplete="off">
+    </div>
+    <div class="field">
+      <label for="auth-password">Password</label>
+      <input id="auth-password" type="password" maxlength="64" placeholder="At least 6 characters" autocomplete="off">
+    </div>
+
+    <button id="auth-submit-btn" class="btn btn-primary">Log in</button>
+    <p id="auth-error" class="error-text"></p>
+    <button id="auth-toggle-btn" class="btn btn-text">Don't have an account? Sign up</button>
+    <button id="auth-back-btn" class="btn btn-text">← Back</button>
+  </div>
+</section>
+
+<!-- FRIENDS HUB -->
+<section id="screen-friends" class="screen">
+  <div class="board-frame settings-card">
+    <p class="eyebrow">Friends</p>
+
+    <div class="my-friend-code-box">
+      <span>Your friend code</span>
+      <div class="friend-code-row">
+        <b id="my-friend-code">------</b>
+        <button id="copy-friend-code-btn" class="btn btn-secondary btn-small">Copy</button>
+      </div>
+    </div>
+
+    <div class="field-row">
+      <input id="add-friend-input" maxlength="6" placeholder="FRIEND CODE" autocomplete="off" style="text-transform:uppercase">
+      <button id="add-friend-btn" class="btn btn-secondary">Add</button>
+    </div>
+    <p id="friends-error" class="error-text"></p>
+
+    <div id="incoming-requests-box" class="hidden">
+      <h3>Requests</h3>
+      <ul id="incoming-requests-list" class="player-list"></ul>
+    </div>
+
+    <h3>My Friends</h3>
+    <ul id="friends-list" class="player-list"></ul>
+
+    <button id="friends-back-btn" class="btn btn-text">← Back</button>
+  </div>
+</section>
+
+<!-- DM CHAT -->
+<section id="screen-dm" class="screen">
+  <div class="board-frame settings-card dm-card">
+    <p class="eyebrow" id="dm-heading">Chat</p>
+    <div id="dm-log" class="chat-log dm-log"></div>
+    <form id="dm-form" class="guess-form">
+      <input id="dm-input" placeholder="Type a message…" autocomplete="off">
+      <button type="submit" class="btn btn-primary btn-small">Send</button>
+    </form>
+    <button id="dm-invite-btn" class="btn btn-secondary btn-small">🎮 Invite to a game</button>
+    <button id="dm-back-btn" class="btn btn-text">← Back to Friends</button>
+  </div>
+</section>
+
+<!-- INCOMING GAME INVITE TOAST -->
+<div id="invite-toast" class="invite-toast hidden">
+  <span id="invite-toast-text"></span>
+  <button id="invite-toast-join-btn" class="btn btn-primary btn-small">Join</button>
+  <button id="invite-toast-dismiss-btn" class="btn btn-text">✕</button>
+</div>
+
 
 <!-- GAME SETTINGS SCREEN (host configures everything before the room is created) -->
 <section id="screen-settings" class="screen">

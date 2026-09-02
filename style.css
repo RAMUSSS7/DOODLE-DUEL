@@ -459,3 +459,46 @@ body.theme-light .game-topbar, body.theme-light .sidebar, body.theme-light .chat
   position: absolute; top: 4px; right: 4px; background: rgba(0,0,0,0.55); color: #fff; border: none;
   border-radius: 50%; width: 20px; height: 20px; font-size: 11px; cursor: pointer; line-height: 1;
 }
+
+/* ---------- Account / Friends ---------- */
+.account-bar { display: flex; align-items: center; justify-content: center; gap: 8px; margin: -8px 0 14px 0; flex-wrap: wrap; }
+.account-bar .hidden { display: none; }
+#account-logged-in { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; justify-content: center; }
+.account-username { font-size: 12px; font-weight: 800; color: #6b6555; }
+.friends-badge {
+  background: #ff6b6b; color: #fff; font-size: 10px; font-weight: 900; border-radius: 8px;
+  padding: 1px 6px; margin-left: 4px;
+}
+.friends-badge.hidden { display: none; }
+
+.my-friend-code-box {
+  background: #fffdf7; border: 2px solid #efe4b0; border-radius: 10px; padding: 10px 12px; margin-bottom: 14px; text-align: center;
+}
+.my-friend-code-box > span { font-size: 11px; color: #8a836c; font-weight: 700; text-transform: uppercase; letter-spacing: 1px; }
+.friend-code-row { display: flex; align-items: center; justify-content: center; gap: 10px; margin-top: 4px; }
+.friend-code-row b { font-size: 22px; letter-spacing: 3px; color: #2c2a24; }
+
+#incoming-requests-box { margin-bottom: 10px; }
+#incoming-requests-box h3, #screen-friends h3 { font-size: 13px; color: #6b6555; margin: 10px 0 6px 0; }
+.player-list .request-actions, .player-list .friend-actions { display: flex; gap: 6px; }
+.player-list .request-actions button, .player-list .friend-actions button {
+  border: none; border-radius: 8px; padding: 4px 10px; font-size: 11px; font-weight: 800; cursor: pointer;
+}
+.btn-accept { background: #4fd6b0; color: #04352a; }
+.btn-decline { background: #efe4b0; color: #5c5335; }
+.btn-invite { background: #ffcf4d; color: #5c4400; }
+.btn-chat { background: #5aa9ff; color: #04263f; }
+.online-dot { width: 8px; height: 8px; border-radius: 50%; background: #ccc; display: inline-block; margin-right: 4px; }
+.online-dot.online { background: #4fd6b0; }
+
+.dm-card { max-width: 420px; }
+.dm-log { min-height: 260px; max-height: 340px; background: #fffdf7; border-radius: 10px; padding: 10px; color: #2c2a24; }
+.dm-log .msg { background: rgba(0,0,0,0.05); }
+.dm-log .msg.mine { background: #fff3cf; text-align: right; }
+
+.invite-toast {
+  position: fixed; bottom: 20px; left: 50%; transform: translateX(-50%);
+  background: #16302b; color: #fff; padding: 12px 16px; border-radius: 14px; display: flex; align-items: center; gap: 10px;
+  z-index: 90; box-shadow: 0 10px 24px rgba(0,0,0,0.4); font-size: 13px; max-width: 90vw;
+}
+.invite-toast.hidden { display: none; }
