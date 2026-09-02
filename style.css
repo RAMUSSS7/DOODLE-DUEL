@@ -502,3 +502,11 @@ body.theme-light .game-topbar, body.theme-light .sidebar, body.theme-light .chat
   z-index: 90; box-shadow: 0 10px 24px rgba(0,0,0,0.4); font-size: 13px; max-width: 90vw;
 }
 .invite-toast.hidden { display: none; }
+
+/* ---------- Phase 1 UI cleanup additions ---------- */
+.topbar-leave-btn {
+  background: rgba(255,107,107,0.15); border: none; border-radius: 8px; color: #ff6b6b;
+  font-size: 16px; padding: 6px 10px; cursor: pointer; flex-shrink: 0;
+}
+.menu-account-username { font-size: 13px; font-weight: 700; color: #f4f0e4; margin-bottom: 10px; }
+#menu-account-guest .btn, #menu-account-logged-in .btn { width: 100%; margin-bottom: 8px; }

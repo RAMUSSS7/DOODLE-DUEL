@@ -58,7 +58,6 @@ const menuBackdrop = document.getElementById('menu-backdrop');
 document.getElementById('menu-toggle-btn').addEventListener('click', () => {
   menuDrawer.classList.add('open');
   menuBackdrop.classList.remove('hidden');
-  updateLeaveRoomVisibility();
 });
 function closeMenu() {
   menuDrawer.classList.remove('open');
@@ -79,16 +78,6 @@ document.querySelectorAll('.menu-item[data-view]').forEach(btn => {
 });
 document.querySelectorAll('.menu-back-btn').forEach(btn => {
   btn.addEventListener('click', () => showMenuView('main'));
-});
-
-function updateLeaveRoomVisibility() {
-  const inRoom = ['screen-lobby', 'screen-game', 'screen-end'].some(id => document.getElementById(id).classList.contains('active'));
-  document.getElementById('menu-leave-room-btn').classList.toggle('hidden', !inRoom);
-}
-document.getElementById('menu-leave-room-btn').addEventListener('click', () => {
-  socket.emit('leave-room');
-  localStorage.removeItem('dd_room');
-  location.reload();
 });
 
 // ---------- Screen helpers ----------
@@ -325,20 +314,24 @@ socket.on('room-joined', ({ code, hostToken: hT, players, wordPack, gameState, t
 
 document.getElementById('start-game-btn').addEventListener('click', () => socket.emit('start-game'));
 
-document.getElementById('share-room-btn').addEventListener('click', async () => {
+function leaveRoomNow() {
+  socket.emit('leave-room');
+  localStorage.removeItem('dd_room');
+  location.reload();
+}
+document.getElementById('lobby-leave-room-btn').addEventListener('click', leaveRoomNow);
+document.getElementById('game-leave-room-btn').addEventListener('click', () => {
+  if (confirm('Leave this room?')) leaveRoomNow();
+});
+
+document.getElementById('copy-code-btn').addEventListener('click', async () => {
   const code = localStorage.getItem('dd_room');
   if (!code) return;
-  const url = `${location.origin}/?join=${code}`;
-  if (navigator.share) {
-    try { await navigator.share({ title: 'Join my Doodle Duel game!', text: `Join my Doodle Duel room with code ${code}`, url }); }
-    catch (e) { /* user cancelled share sheet, ignore */ }
-  } else {
-    try {
-      await navigator.clipboard.writeText(url);
-      showToast('🔗 Invite link copied!');
-    } catch (e) {
-      showToast(`Room code: ${code}`);
-    }
+  try {
+    await navigator.clipboard.writeText(code);
+    showToast(`📋 Code copied: ${code}`);
+  } catch (e) {
+    showToast(`Room code: ${code}`);
   }
 });
 
@@ -1118,16 +1111,16 @@ function apiPost(path, body) {
 
 function setLoggedInUI(user) {
   currentUser = user;
-  document.getElementById('goto-auth-btn').classList.add('hidden');
-  document.getElementById('account-logged-in').classList.remove('hidden');
-  document.getElementById('account-username-label').textContent = user.username;
+  document.getElementById('menu-account-guest').classList.add('hidden');
+  document.getElementById('menu-account-logged-in').classList.remove('hidden');
+  document.getElementById('menu-account-username-label').textContent = `Logged in as ${user.username}`;
   document.getElementById('my-friend-code').textContent = user.friendCode;
   if (!nameInput.value.trim()) nameInput.value = user.username;
 }
 function setLoggedOutUI() {
   currentUser = null;
-  document.getElementById('goto-auth-btn').classList.remove('hidden');
-  document.getElementById('account-logged-in').classList.add('hidden');
+  document.getElementById('menu-account-guest').classList.remove('hidden');
+  document.getElementById('menu-account-logged-in').classList.add('hidden');
   document.getElementById('friends-badge').classList.add('hidden');
 }
 
@@ -1144,7 +1137,7 @@ socket.on('friends:auth-error', () => {
   setLoggedOutUI();
 });
 
-document.getElementById('goto-auth-btn').addEventListener('click', () => showScreen('screen-auth'));
+document.getElementById('menu-goto-auth-btn').addEventListener('click', () => { closeMenu(); showScreen('screen-auth'); });
 document.getElementById('auth-back-btn').addEventListener('click', () => showScreen('screen-home'));
 document.getElementById('auth-toggle-btn').addEventListener('click', () => {
   authMode = authMode === 'login' ? 'signup' : 'login';
@@ -1173,13 +1166,14 @@ document.getElementById('auth-submit-btn').addEventListener('click', async () =>
     errEl.textContent = e.message;
   }
 });
-document.getElementById('logout-btn').addEventListener('click', () => {
+document.getElementById('menu-logout-btn').addEventListener('click', () => {
   localStorage.removeItem('dd_auth_token');
   location.reload();
 });
 
 // ---------- Friends hub ----------
-document.getElementById('goto-friends-btn').addEventListener('click', () => {
+document.getElementById('menu-goto-friends-btn').addEventListener('click', () => {
+  closeMenu();
   showScreen('screen-friends');
   socket.emit('friends:get-list');
 });

@@ -23,12 +23,26 @@
   </div>
 
   <div id="menu-view-main" class="menu-view">
+    <button class="menu-item" data-view="account">🔑 Account</button>
     <button class="menu-item" data-view="settings">⚙️ Settings</button>
     <button class="menu-item" data-view="stats">📊 My Stats</button>
     <button class="menu-item" data-view="doodles">🖼 My Doodles</button>
     <button class="menu-item" data-view="howto">📖 How to Play</button>
     <button class="menu-item" data-view="about">ℹ️ About</button>
-    <button id="menu-leave-room-btn" class="menu-item menu-item-danger hidden">🚪 Leave Room</button>
+  </div>
+
+  <div id="menu-view-account" class="menu-view hidden">
+    <button class="menu-back-btn">← Back</button>
+    <h3>Account</h3>
+    <div id="menu-account-guest">
+      <p class="hint-text">Log in to add friends, chat, and get invited straight into games.</p>
+      <button id="menu-goto-auth-btn" class="btn btn-primary btn-small">🔑 Log in / Sign up</button>
+    </div>
+    <div id="menu-account-logged-in" class="hidden">
+      <p class="menu-account-username" id="menu-account-username-label"></p>
+      <button id="menu-goto-friends-btn" class="btn btn-secondary btn-small">👥 Friends <span id="friends-badge" class="friends-badge hidden">0</span></button>
+      <button id="menu-logout-btn" class="btn btn-text">Log out</button>
+    </div>
   </div>
 
   <div id="menu-view-settings" class="menu-view hidden">
@@ -85,15 +99,6 @@
     <p class="tagline">Grab your chalk. Guess the doodle. Beat the clock.</p>
     <p id="level-badge" class="level-badge">Lv.1 • 0 XP</p>
     <p id="reconnect-msg" class="hint-text hidden">Reconnecting to your last game…</p>
-
-    <div id="account-bar" class="account-bar">
-      <button id="goto-auth-btn" class="btn btn-text">🔑 Log in / Sign up</button>
-      <div id="account-logged-in" class="hidden">
-        <span id="account-username-label" class="account-username"></span>
-        <button id="goto-friends-btn" class="btn btn-text">👥 Friends <span id="friends-badge" class="friends-badge hidden">0</span></button>
-        <button id="logout-btn" class="btn btn-text">Log out</button>
-      </div>
-    </div>
 
     <div class="field">
       <label for="name-input">Your name</label>
@@ -308,7 +313,7 @@
   <div class="board-frame lobby-card">
     <p class="eyebrow">Room code — share it with friends <span id="public-room-lobby-tag" class="public-tag hidden">🌍 Public</span></p>
     <div class="room-code-display" id="room-code-display">-----</div>
-    <button id="share-room-btn" class="btn btn-secondary btn-small">🔗 Share invite link</button>
+    <button id="copy-code-btn" class="btn btn-secondary btn-small">📋 Copy Code</button>
 
     <div class="lobby-players">
       <h3>Players <span id="lobby-count">(0)</span></h3>
@@ -319,7 +324,7 @@
 
     <button id="start-game-btn" class="btn btn-primary">Start Game</button>
     <p id="lobby-hint" class="hint-text">Waiting for the host to start the game…</p>
-    <p class="hint-text">Use the ☰ Menu to leave the room.</p>
+    <button id="lobby-leave-room-btn" class="btn btn-text">🚪 Leave room</button>
   </div>
 </section>
 
@@ -336,6 +341,7 @@
 <!-- GAME SCREEN -->
 <section id="screen-game" class="screen">
   <div class="game-topbar">
+    <button id="game-leave-room-btn" class="topbar-leave-btn" title="Leave room">🚪</button>
     <div class="topbar-item">Round <span id="round-label">1/6</span></div>
     <div class="timer-track"><div id="timer-fill" class="timer-fill"></div></div>
     <div class="topbar-item word-display" id="word-display">_ _ _ _</div>
