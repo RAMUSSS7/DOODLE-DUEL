@@ -1171,6 +1171,66 @@ document.getElementById('menu-logout-btn').addEventListener('click', () => {
   location.reload();
 });
 
+// ---------- My Profile ----------
+const DEFAULT_AVATAR = 'data:image/svg+xml;utf8,' + encodeURIComponent(
+  '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100"><rect width="100" height="100" fill="%23efe4b0"/><circle cx="50" cy="38" r="18" fill="%23b3aa8c"/><ellipse cx="50" cy="88" rx="30" ry="22" fill="%23b3aa8c"/></svg>'
+);
+document.getElementById('menu-goto-profile-btn').addEventListener('click', () => {
+  closeMenu();
+  showScreen('screen-profile');
+  socket.emit('profile:get');
+});
+document.getElementById('profile-back-btn').addEventListener('click', () => showScreen('screen-home'));
+
+socket.on('profile:data', data => {
+  document.getElementById('profile-username-label').textContent = data.username;
+  document.getElementById('profile-avatar-img').src = data.avatarDataUrl || DEFAULT_AVATAR;
+  const bioInput = document.getElementById('profile-bio-input');
+  bioInput.value = data.bio || '';
+  document.getElementById('profile-bio-count').textContent = `${bioInput.value.length}/150`;
+  document.getElementById('profile-stat-games').textContent = data.gamesPlayed;
+  document.getElementById('profile-stat-wins').textContent = data.wins;
+  document.getElementById('profile-stat-best').textContent = data.bestScore;
+  document.getElementById('profile-level-line').textContent = `Lv.${levelFromXP(getXP())} • ${getXP()} XP`;
+});
+
+document.getElementById('profile-bio-input').addEventListener('input', e => {
+  document.getElementById('profile-bio-count').textContent = `${e.target.value.length}/150`;
+});
+document.getElementById('profile-save-bio-btn').addEventListener('click', () => {
+  const bio = document.getElementById('profile-bio-input').value;
+  socket.emit('profile:update-bio', { bio });
+});
+socket.on('profile:bio-updated', () => showToast('✅ Bio saved'));
+socket.on('profile:error', ({ message }) => showToast('⚠️ ' + message));
+
+document.getElementById('profile-change-photo-btn').addEventListener('click', () => {
+  document.getElementById('profile-avatar-input').click();
+});
+document.getElementById('profile-avatar-input').addEventListener('change', e => {
+  const file = e.target.files[0];
+  if (!file) return;
+  const reader = new FileReader();
+  reader.onload = () => {
+    const img = new Image();
+    img.onload = () => {
+      const size = 160;
+      const canvas = document.createElement('canvas');
+      canvas.width = size; canvas.height = size;
+      const ctx = canvas.getContext('2d');
+      const scale = Math.max(size / img.width, size / img.height);
+      const w = img.width * scale, h = img.height * scale;
+      ctx.drawImage(img, (size - w) / 2, (size - h) / 2, w, h);
+      const dataUrl = canvas.toDataURL('image/jpeg', 0.8);
+      document.getElementById('profile-avatar-img').src = dataUrl;
+      socket.emit('profile:update-avatar', { dataUrl });
+    };
+    img.src = reader.result;
+  };
+  reader.readAsDataURL(file);
+});
+socket.on('profile:avatar-updated', () => showToast('✅ Photo updated'));
+
 // ---------- Friends hub ----------
 document.getElementById('menu-goto-friends-btn').addEventListener('click', () => {
   closeMenu();

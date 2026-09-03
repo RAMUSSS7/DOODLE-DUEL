@@ -510,3 +510,24 @@ body.theme-light .game-topbar, body.theme-light .sidebar, body.theme-light .chat
 }
 .menu-account-username { font-size: 13px; font-weight: 700; color: #f4f0e4; margin-bottom: 10px; }
 #menu-account-guest .btn, #menu-account-logged-in .btn { width: 100%; margin-bottom: 8px; }
+
+/* ---------- My Profile ---------- */
+.profile-card { text-align: center; }
+.profile-avatar-wrap { display: flex; flex-direction: column; align-items: center; gap: 8px; margin-bottom: 14px; }
+.profile-avatar-img {
+  width: 96px; height: 96px; border-radius: 50%; object-fit: cover; background: #efe4b0;
+  border: 3px solid #ffcf4d;
+}
+.profile-username { font-size: 16px; font-weight: 800; color: #2c2a24; margin-bottom: 14px; }
+.profile-bio-count { font-weight: 400; color: #b3aa8c; font-size: 11px; float: right; }
+#profile-bio-input {
+  width: 100%; min-height: 70px; border-radius: 10px; border: 2px solid #e3d8b8; padding: 10px;
+  font-size: 13px; resize: vertical; margin-bottom: 8px; font-family: inherit;
+}
+.profile-stats-row { display: flex; gap: 8px; margin: 14px 0 6px 0; }
+.profile-stat {
+  flex: 1; background: #fffdf7; border: 2px solid #efe4b0; border-radius: 10px; padding: 10px 4px;
+  display: flex; flex-direction: column; gap: 2px;
+}
+.profile-stat b { font-size: 18px; color: #2c2a24; }
+.profile-stat span { font-size: 10px; color: #8a836c; text-transform: uppercase; letter-spacing: 0.5px; }

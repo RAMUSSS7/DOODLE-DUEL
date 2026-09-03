@@ -40,6 +40,7 @@
     </div>
     <div id="menu-account-logged-in" class="hidden">
       <p class="menu-account-username" id="menu-account-username-label"></p>
+      <button id="menu-goto-profile-btn" class="btn btn-secondary btn-small">👤 My Profile</button>
       <button id="menu-goto-friends-btn" class="btn btn-secondary btn-small">👥 Friends <span id="friends-badge" class="friends-badge hidden">0</span></button>
       <button id="menu-logout-btn" class="btn btn-text">Log out</button>
     </div>
@@ -139,6 +140,36 @@
     <p id="auth-error" class="error-text"></p>
     <button id="auth-toggle-btn" class="btn btn-text">Don't have an account? Sign up</button>
     <button id="auth-back-btn" class="btn btn-text">← Back</button>
+  </div>
+</section>
+
+<!-- MY PROFILE -->
+<section id="screen-profile" class="screen">
+  <div class="board-frame settings-card profile-card">
+    <p class="eyebrow">My Profile</p>
+
+    <div class="profile-avatar-wrap">
+      <img id="profile-avatar-img" class="profile-avatar-img" src="" alt="Your avatar">
+      <button id="profile-change-photo-btn" class="btn btn-secondary btn-small">📷 Change photo</button>
+      <input type="file" id="profile-avatar-input" accept="image/*" class="hidden">
+    </div>
+
+    <p class="profile-username" id="profile-username-label"></p>
+
+    <div class="field">
+      <label for="profile-bio-input">Bio <span id="profile-bio-count" class="profile-bio-count">0/150</span></label>
+      <textarea id="profile-bio-input" maxlength="150" placeholder="Tell people a bit about yourself…"></textarea>
+      <button id="profile-save-bio-btn" class="btn btn-secondary btn-small">Save bio</button>
+    </div>
+
+    <div class="profile-stats-row">
+      <div class="profile-stat"><b id="profile-stat-games">0</b><span>Games</span></div>
+      <div class="profile-stat"><b id="profile-stat-wins">0</b><span>Wins</span></div>
+      <div class="profile-stat"><b id="profile-stat-best">0</b><span>Best score</span></div>
+    </div>
+    <p id="profile-level-line" class="level-badge">Lv.1 • 0 XP</p>
+
+    <button id="profile-back-btn" class="btn btn-text">← Back</button>
   </div>
 </section>
 

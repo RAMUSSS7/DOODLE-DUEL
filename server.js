@@ -366,6 +366,24 @@ function endGame(room) {
     teamMode: room.teamMode,
     teams: teamTotals(room)
   });
+  recordGameResults(final);
+}
+
+async function recordGameResults(final) {
+  try {
+    for (let i = 0; i < final.length; i++) {
+      const p = final[i];
+      const sock = io.sockets.sockets.get(p.id);
+      const userId = sock && sock.data && sock.data.userId;
+      if (!userId) continue;
+      await pool.query(
+        `INSERT INTO game_results (user_id, score, rank, total_players) VALUES ($1, $2, $3, $4)`,
+        [userId, p.score, i + 1, final.length]
+      );
+    }
+  } catch (err) {
+    console.error('recordGameResults error', err);
+  }
 }
 
 function resetGame(room) {
@@ -461,6 +479,65 @@ io.on('connection', socket => {
     socket.data.username = user.username;
     markOnline(user.id, socket.id);
     socket.emit('friends:auth-ok', { userId: user.id, username: user.username, friendCode: user.friend_code });
+  });
+
+  // ---------------- Profile ----------------
+  socket.on('profile:get', async () => {
+    const me = socket.data.userId;
+    if (!me) return;
+    try {
+      const userRes = await pool.query('SELECT username, bio, avatar_data_url, friend_code FROM users WHERE id=$1', [me]);
+      const statsRes = await pool.query(
+        `SELECT COUNT(*)::int AS games_played,
+                COUNT(*) FILTER (WHERE rank = 1)::int AS wins,
+                COALESCE(MAX(score), 0)::int AS best_score
+         FROM game_results WHERE user_id = $1`,
+        [me]
+      );
+      if (!userRes.rows.length) return;
+      const u = userRes.rows[0];
+      const s = statsRes.rows[0];
+      socket.emit('profile:data', {
+        username: u.username,
+        bio: u.bio || '',
+        avatarDataUrl: u.avatar_data_url || null,
+        friendCode: u.friend_code,
+        gamesPlayed: s.games_played,
+        wins: s.wins,
+        bestScore: s.best_score
+      });
+    } catch (err) {
+      console.error('profile:get error', err);
+    }
+  });
+
+  socket.on('profile:update-bio', async ({ bio }) => {
+    const me = socket.data.userId;
+    if (!me) return;
+    const clean = String(bio || '').slice(0, 150);
+    try {
+      await pool.query('UPDATE users SET bio=$1 WHERE id=$2', [clean, me]);
+      socket.emit('profile:bio-updated', { bio: clean });
+    } catch (err) {
+      console.error('profile:update-bio error', err);
+    }
+  });
+
+  socket.on('profile:update-avatar', async ({ dataUrl }) => {
+    const me = socket.data.userId;
+    if (!me) return;
+    if (typeof dataUrl !== 'string' || dataUrl.length > 200000) {
+      return socket.emit('profile:error', { message: 'That image is too large.' });
+    }
+    if (!/^data:image\/(png|jpeg|jpg|webp);base64,/.test(dataUrl)) {
+      return socket.emit('profile:error', { message: 'Unsupported image format.' });
+    }
+    try {
+      await pool.query('UPDATE users SET avatar_data_url=$1 WHERE id=$2', [dataUrl, me]);
+      socket.emit('profile:avatar-updated', { avatarDataUrl: dataUrl });
+    } catch (err) {
+      console.error('profile:update-avatar error', err);
+    }
   });
 
   socket.on('friends:send-request', async ({ friendCode }) => {

@@ -20,6 +20,9 @@ async function initSchema() {
       created_at TIMESTAMPTZ NOT NULL DEFAULT now()
     );
 
+    ALTER TABLE users ADD COLUMN IF NOT EXISTS bio TEXT NOT NULL DEFAULT '';
+    ALTER TABLE users ADD COLUMN IF NOT EXISTS avatar_data_url TEXT;
+
     CREATE TABLE IF NOT EXISTS sessions (
       token TEXT PRIMARY KEY,
       user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
@@ -51,6 +54,17 @@ async function initSchema() {
     );
 
     CREATE INDEX IF NOT EXISTS idx_messages_pair ON messages (LEAST(from_user_id,to_user_id), GREATEST(from_user_id,to_user_id), created_at);
+
+    CREATE TABLE IF NOT EXISTS game_results (
+      id SERIAL PRIMARY KEY,
+      user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+      score INTEGER NOT NULL,
+      rank INTEGER NOT NULL,
+      total_players INTEGER NOT NULL,
+      created_at TIMESTAMPTZ NOT NULL DEFAULT now()
+    );
+
+    CREATE INDEX IF NOT EXISTS idx_game_results_user ON game_results (user_id, created_at DESC);
   `);
 }
 

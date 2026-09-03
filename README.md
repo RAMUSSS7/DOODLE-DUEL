@@ -57,6 +57,9 @@ that way both locally and in your GitHub repo, or the server won't find them.
 - **Direct messages** between friends, independent of any game room
 - **Invite a friend straight to a room** — no need to copy/paste a link;
   they get an in-app notification with a one-tap Join button
+- **My Profile** — upload a profile photo, write a short bio, and see your
+  games played / wins / best score (tracked automatically after every
+  multiplayer game you finish while logged in)
 
 ## Run it locally
 
