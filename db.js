@@ -65,6 +65,13 @@ async function initSchema() {
     );
 
     CREATE INDEX IF NOT EXISTS idx_game_results_user ON game_results (user_id, created_at DESC);
+
+    CREATE TABLE IF NOT EXISTS recent_plays (
+      user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+      played_with_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+      played_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+      PRIMARY KEY (user_id, played_with_id)
+    );
   `);
 }
 

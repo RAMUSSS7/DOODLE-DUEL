@@ -310,6 +310,7 @@ socket.on('room-joined', ({ code, hostToken: hT, players, wordPack, gameState, t
   renderSettingsSummary(wordPack, teamMode, difficulty, speedRoundEnabled);
   if (gameState === 'lobby') showScreen('screen-lobby');
   renderPlayerList(players);
+  if (currentUser) socket.emit('friends:get-list');
 });
 
 document.getElementById('start-game-btn').addEventListener('click', () => socket.emit('start-game'));
@@ -1238,6 +1239,59 @@ document.getElementById('menu-goto-friends-btn').addEventListener('click', () =>
   socket.emit('friends:get-list');
 });
 document.getElementById('friends-back-btn').addEventListener('click', () => showScreen('screen-home'));
+
+// ---------- Invite Friends overlay (from lobby) ----------
+document.getElementById('lobby-invite-friends-btn').addEventListener('click', () => {
+  socket.emit('friends:get-list');
+  renderInviteFriendsOverlay();
+  showOverlay('invite-friends-overlay');
+});
+document.getElementById('invite-friends-close-btn').addEventListener('click', () => hideOverlay('invite-friends-overlay'));
+function renderInviteFriendsOverlay() {
+  const list = document.getElementById('invite-friends-list');
+  const online = latestFriendsList.friends.filter(f => f.online);
+  list.innerHTML = '';
+  if (!online.length) {
+    list.innerHTML = '<p class="hint-text">None of your friends are online right now.</p>';
+    return;
+  }
+  online.forEach(f => {
+    const row = document.createElement('div');
+    row.className = 'public-room-row';
+    row.innerHTML = `<span><span class="online-dot online"></span>${escapeHtml(f.username)}</span>`;
+    const btn = document.createElement('button');
+    btn.className = 'btn btn-primary btn-small';
+    btn.textContent = 'Invite';
+    btn.addEventListener('click', () => {
+      socket.emit('friends:invite', { friendUserId: f.id, myToken, myName: nameInput.value.trim() || currentUser.username });
+      hideOverlay('invite-friends-overlay');
+    });
+    row.appendChild(btn);
+    list.appendChild(row);
+  });
+}
+
+// ---------- Recently Played With ----------
+document.getElementById('menu-goto-friends-btn').addEventListener('click', () => {
+  socket.emit('friends:recent-played');
+});
+socket.on('friends:recent-played-list', ({ recent }) => {
+  const box = document.getElementById('recent-played-box');
+  const list = document.getElementById('recent-played-list');
+  list.innerHTML = '';
+  if (!recent.length) { box.classList.add('hidden'); return; }
+  box.classList.remove('hidden');
+  recent.forEach(r => {
+    const li = document.createElement('li');
+    li.innerHTML = `<span class="p-name">${escapeHtml(r.username)}</span>`;
+    const btn = document.createElement('button');
+    btn.className = 'btn-add-friend';
+    btn.textContent = '+ Add Friend';
+    btn.addEventListener('click', () => socket.emit('friends:send-request-by-id', { toUserId: r.id }));
+    li.appendChild(btn);
+    list.appendChild(li);
+  });
+});
 document.getElementById('copy-friend-code-btn').addEventListener('click', async () => {
   if (!currentUser) return;
   try { await navigator.clipboard.writeText(currentUser.friendCode); showToast('📋 Friend code copied!'); }
@@ -1252,6 +1306,7 @@ document.getElementById('add-friend-btn').addEventListener('click', () => {
 socket.on('friends:request-sent', ({ username }) => {
   document.getElementById('add-friend-input').value = '';
   showToast(`✅ Friend request sent to ${username}`);
+  socket.emit('friends:recent-played');
 });
 socket.on('friends:error', ({ message }) => {
   const errEl = document.getElementById('friends-error');
@@ -1267,10 +1322,15 @@ socket.on('friends:request-accepted', ({ byUsername }) => {
   showToast(`🎉 ${byUsername} accepted your friend request!`);
 });
 
+let latestFriendsList = { friends: [], incoming: [] };
 socket.on('friends:list', ({ friends, incoming }) => {
+  latestFriendsList = { friends, incoming };
   const badge = document.getElementById('friends-badge');
   if (incoming.length) { badge.textContent = incoming.length; badge.classList.remove('hidden'); }
   else badge.classList.add('hidden');
+
+  document.getElementById('lobby-invite-friends-btn').classList.toggle('hidden', !currentUser || !friends.some(f => f.online));
+  if (!document.getElementById('invite-friends-overlay').classList.contains('hidden')) renderInviteFriendsOverlay();
 
   const reqBox = document.getElementById('incoming-requests-box');
   const reqList = document.getElementById('incoming-requests-list');
@@ -1315,7 +1375,7 @@ socket.on('friends:list', ({ friends, incoming }) => {
     if (f.online) {
       const inviteBtn = document.createElement('button');
       inviteBtn.className = 'btn-invite'; inviteBtn.textContent = '🎮 Invite';
-      inviteBtn.addEventListener('click', () => socket.emit('friends:invite', { friendUserId: f.id }));
+      inviteBtn.addEventListener('click', () => socket.emit('friends:invite', { friendUserId: f.id, myToken, myName: nameInput.value.trim() || currentUser.username }));
       actions.appendChild(inviteBtn);
     }
     li.appendChild(actions);
@@ -1323,7 +1383,14 @@ socket.on('friends:list', ({ friends, incoming }) => {
   });
 });
 
-socket.on('friends:invite-created', () => showToast('🎮 Invite sent!'));
+socket.on('friends:invite-created', ({ createdNew }) => {
+  if (createdNew) {
+    showScreen('screen-lobby');
+    showToast('🎮 Invite sent! Waiting in your new room…');
+  } else {
+    showToast('🎮 Invite sent!');
+  }
+});
 
 // ---------- DM chat ----------
 function openDmWith(friend) {
@@ -1335,7 +1402,7 @@ function openDmWith(friend) {
 }
 document.getElementById('dm-back-btn').addEventListener('click', () => showScreen('screen-friends'));
 document.getElementById('dm-invite-btn').addEventListener('click', () => {
-  if (currentDmFriend) socket.emit('friends:invite', { friendUserId: currentDmFriend.id });
+  if (currentDmFriend) socket.emit('friends:invite', { friendUserId: currentDmFriend.id, myToken, myName: nameInput.value.trim() || currentUser.username });
 });
 document.getElementById('dm-form').addEventListener('submit', e => {
   e.preventDefault();

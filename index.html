@@ -200,6 +200,11 @@
     <h3>My Friends</h3>
     <ul id="friends-list" class="player-list"></ul>
 
+    <div id="recent-played-box" class="hidden">
+      <h3>Recently Played With</h3>
+      <ul id="recent-played-list" class="player-list"></ul>
+    </div>
+
     <button id="friends-back-btn" class="btn btn-text">← Back</button>
   </div>
 </section>
@@ -339,12 +344,22 @@
   </div>
 </div>
 
+<!-- INVITE FRIENDS TO THIS ROOM OVERLAY -->
+<div id="invite-friends-overlay" class="overlay hidden">
+  <div class="board-frame browse-card">
+    <p class="eyebrow">Invite a friend</p>
+    <div id="invite-friends-list" class="public-rooms-list"></div>
+    <button id="invite-friends-close-btn" class="btn btn-secondary">Close</button>
+  </div>
+</div>
+
 <!-- LOBBY SCREEN -->
 <section id="screen-lobby" class="screen">
   <div class="board-frame lobby-card">
     <p class="eyebrow">Room code — share it with friends <span id="public-room-lobby-tag" class="public-tag hidden">🌍 Public</span></p>
     <div class="room-code-display" id="room-code-display">-----</div>
     <button id="copy-code-btn" class="btn btn-secondary btn-small">📋 Copy Code</button>
+    <button id="lobby-invite-friends-btn" class="btn btn-secondary btn-small hidden">👥 Invite Friends</button>
 
     <div class="lobby-players">
       <h3>Players <span id="lobby-count">(0)</span></h3>

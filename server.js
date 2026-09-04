@@ -371,15 +371,27 @@ function endGame(room) {
 
 async function recordGameResults(final) {
   try {
+    const loggedInUserIds = [];
     for (let i = 0; i < final.length; i++) {
       const p = final[i];
       const sock = io.sockets.sockets.get(p.id);
       const userId = sock && sock.data && sock.data.userId;
       if (!userId) continue;
+      loggedInUserIds.push(userId);
       await pool.query(
         `INSERT INTO game_results (user_id, score, rank, total_players) VALUES ($1, $2, $3, $4)`,
         [userId, p.score, i + 1, final.length]
       );
+    }
+    for (const a of loggedInUserIds) {
+      for (const b of loggedInUserIds) {
+        if (a === b) continue;
+        await pool.query(
+          `INSERT INTO recent_plays (user_id, played_with_id, played_at) VALUES ($1, $2, now())
+           ON CONFLICT (user_id, played_with_id) DO UPDATE SET played_at = now()`,
+          [a, b]
+        );
+      }
     }
   } catch (err) {
     console.error('recordGameResults error', err);
@@ -623,23 +635,94 @@ io.on('connection', socket => {
   }
   socket.on('friends:get-list', () => { if (socket.data.userId) pushFriendsList(socket.data.userId); });
 
-  socket.on('friends:invite', ({ friendUserId }) => {
+  socket.on('friends:invite', ({ friendUserId, myToken, myName }) => {
     const me = socket.data.userId;
     if (!me) return;
     if (!isOnline(friendUserId)) return socket.emit('friends:error', { message: 'Your friend is not online right now.' });
 
+    const existingCode = socket.data.roomCode;
+    const existingRoom = existingCode && rooms[existingCode];
+    const stillMember = existingRoom && existingRoom.players.some(p => p.id === socket.id);
+
+    if (existingRoom && stillMember && existingRoom.state === 'lobby') {
+      // Already hosting/sitting in a lobby — invite the friend into THIS room.
+      socket.emit('friends:invite-created', { code: existingCode, createdNew: false });
+      emitToUser(friendUserId, 'friends:invite-received', { fromUsername: socket.data.username, code: existingCode });
+      return;
+    }
+
+    // Not currently in a joinable room — spin up a fresh one and actually
+    // join the inviter into it too, so they land in the lobby together.
     const code = makeRoomCode();
     const room = {
-      code, players: [], hostToken: 'user-' + me, state: 'lobby', currentDrawerIndex: -1,
+      code, players: [], hostToken: myToken, state: 'lobby', currentDrawerIndex: -1,
       currentWord: null, maskedWord: null, roundNumber: 0, totalRounds: 0, timer: null, timeLeft: 0,
       wordOptions: [], drawingHistory: [], groupCounter: 0, currentGroupId: null, hintsSent: 0,
       wordPack: 'english', customWords: [], usedWords: new Set(), firstGuesserToken: null,
       isPublic: false, teamMode: false, speedRoundEnabled: true, speedRoundDone: false, isSpeedRound: false,
       difficultyFilter: 'mixed'
     };
+    room.players.push(newPlayer(myToken, socket.id, myName));
     rooms[code] = room;
-    socket.emit('friends:invite-created', { code });
+    socket.join(code);
+    socket.data.roomCode = code;
+
+    socket.emit('room-joined', {
+      code, you: myToken, hostToken: room.hostToken, players: publicPlayers(room),
+      wordPack: room.wordPack, gameState: room.state, teamMode: room.teamMode, isPublic: room.isPublic,
+      difficulty: room.difficultyFilter, speedRoundEnabled: room.speedRoundEnabled
+    });
+    socket.emit('friends:invite-created', { code, createdNew: true });
     emitToUser(friendUserId, 'friends:invite-received', { fromUsername: socket.data.username, code });
+  });
+
+  socket.on('friends:send-request-by-id', async ({ toUserId }) => {
+    const me = socket.data.userId;
+    if (!me || !toUserId || toUserId === me) return;
+    try {
+      const target = await pool.query('SELECT username, friend_code FROM users WHERE id=$1', [toUserId]);
+      if (!target.rows.length) return socket.emit('friends:error', { message: 'That player no longer exists.' });
+      const already = await pool.query(
+        'SELECT 1 FROM friendships WHERE (user_id_a=$1 AND user_id_b=$2) OR (user_id_a=$2 AND user_id_b=$1)',
+        [me, toUserId]
+      );
+      if (already.rows.length) return socket.emit('friends:error', { message: 'You are already friends.' });
+      await pool.query(
+        `INSERT INTO friend_requests (from_user_id, to_user_id, status)
+         VALUES ($1, $2, 'pending')
+         ON CONFLICT (from_user_id, to_user_id) DO UPDATE SET status='pending', created_at=now()`,
+        [me, toUserId]
+      );
+      socket.emit('friends:request-sent', { username: target.rows[0].username });
+      emitToUser(toUserId, 'friends:incoming-request', { fromUserId: me, fromUsername: socket.data.username });
+    } catch (err) {
+      console.error('send-request-by-id error', err);
+      socket.emit('friends:error', { message: 'Could not send friend request.' });
+    }
+  });
+
+  socket.on('friends:recent-played', async () => {
+    const me = socket.data.userId;
+    if (!me) return;
+    try {
+      const rows = await pool.query(
+        `SELECT rp.played_with_id AS id, u.username, rp.played_at
+         FROM recent_plays rp
+         JOIN users u ON u.id = rp.played_with_id
+         WHERE rp.user_id = $1
+           AND NOT EXISTS (
+             SELECT 1 FROM friendships f
+             WHERE (f.user_id_a = $1 AND f.user_id_b = rp.played_with_id)
+                OR (f.user_id_b = $1 AND f.user_id_a = rp.played_with_id)
+           )
+         ORDER BY rp.played_at DESC
+         LIMIT 5`,
+        [me]
+      );
+      socket.emit('friends:recent-played-list', { recent: rows.rows.map(r => ({ id: r.id, username: r.username })) });
+    } catch (err) {
+      console.error('friends:recent-played error', err);
+    }
   });
 
   socket.on('friends:dm-send', async ({ toUserId, text }) => {
@@ -910,12 +993,15 @@ io.on('connection', socket => {
   function handleDisconnect(socket, intentional) {
     const code = socket.data.roomCode;
     const room = rooms[code];
-    if (!room) return;
+    if (!room) { socket.data.roomCode = null; return; }
     const player = room.players.find(p => p.token === socket.data.token);
-    if (!player) return;
+    if (!player) { if (intentional) socket.data.roomCode = null; return; }
 
     if (intentional) {
       room.players = room.players.filter(p => p.token !== socket.data.token);
+      socket.leave(code);
+      socket.data.roomCode = null;
+      if (room.players.length === 0) { clearRoomTimer(room); delete rooms[code]; return; }
     } else {
       player.connected = false;
       player.leaveTimer = setTimeout(() => {

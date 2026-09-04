@@ -56,7 +56,11 @@ that way both locally and in your GitHub repo, or the server won't find them.
 - Friends list with live online/offline status
 - **Direct messages** between friends, independent of any game room
 - **Invite a friend straight to a room** — no need to copy/paste a link;
-  they get an in-app notification with a one-tap Join button
+  they get an in-app notification with a one-tap Join button. Works from
+  the lobby (invites into the room you're already in) or from a DM/Friends
+  screen (spins up a fresh room and joins you into it automatically)
+- **Recently Played With** — after finishing a game with someone who isn't
+  yet a friend, they show up here with a one-tap "Add Friend" button
 - **My Profile** — upload a profile photo, write a short bio, and see your
   games played / wins / best score (tracked automatically after every
   multiplayer game you finish while logged in)
