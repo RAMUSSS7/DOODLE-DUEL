@@ -65,6 +65,12 @@ that way both locally and in your GitHub repo, or the server won't find them.
   games played / wins / best score (tracked automatically after every
   multiplayer game you finish while logged in)
 
+### Global Leaderboard
+- Top 20 rankings across three categories: **Best Score**, **Most Wins**,
+  and **Most Games Played** — pulled live from every completed multiplayer
+  game, for every logged-in player
+- Shows your own current rank and value even if you're outside the top 20
+
 ### Safety
 - Basic **profanity filter** applied to game chat and direct messages
 - **Block/Unblock** another account — removes any friendship, and blocked

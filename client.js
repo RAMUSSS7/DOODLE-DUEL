@@ -1224,6 +1224,45 @@ document.getElementById('menu-goto-profile-btn').addEventListener('click', () =>
 });
 document.getElementById('profile-back-btn').addEventListener('click', () => showScreen('screen-home'));
 
+// ---------- Leaderboard ----------
+let currentLbCategory = 'best_score';
+document.getElementById('menu-goto-leaderboard-btn').addEventListener('click', () => {
+  closeMenu();
+  showScreen('screen-leaderboard');
+  socket.emit('leaderboard:get', { category: currentLbCategory });
+});
+document.getElementById('leaderboard-back-btn').addEventListener('click', () => showScreen('screen-home'));
+document.querySelectorAll('.lb-tab').forEach(btn => {
+  btn.addEventListener('click', () => {
+    currentLbCategory = btn.dataset.category;
+    document.querySelectorAll('.lb-tab').forEach(b => b.classList.remove('active'));
+    btn.classList.add('active');
+    socket.emit('leaderboard:get', { category: currentLbCategory });
+  });
+});
+const LB_LABELS = { best_score: 'pts', wins: 'wins', games: 'games' };
+socket.on('leaderboard:data', ({ category, top, myRank, myValue }) => {
+  if (category !== currentLbCategory) return;
+  const list = document.getElementById('leaderboard-list');
+  list.innerHTML = '';
+  if (!top.length) {
+    list.innerHTML = '<li class="hint-text" style="border:none;background:none;">No games recorded yet — be the first!</li>';
+  }
+  top.forEach((row, i) => {
+    const li = document.createElement('li');
+    if (currentUser && row.id === currentUser.id) li.classList.add('me');
+    li.innerHTML = `<span><span class="rank">#${i + 1}</span>${escapeHtml(row.username)}</span><span>${row.value} ${LB_LABELS[category]}</span>`;
+    list.appendChild(li);
+  });
+  const rankLine = document.getElementById('leaderboard-my-rank');
+  if (myRank) {
+    rankLine.textContent = `Your rank: #${myRank} (${myValue} ${LB_LABELS[category]})`;
+    rankLine.classList.remove('hidden');
+  } else {
+    rankLine.classList.add('hidden');
+  }
+});
+
 socket.on('profile:data', data => {
   document.getElementById('profile-username-label').textContent = data.username;
   document.getElementById('profile-avatar-img').src = data.avatarDataUrl || DEFAULT_AVATAR;

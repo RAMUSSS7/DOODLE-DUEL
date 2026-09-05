@@ -506,6 +506,61 @@ io.on('connection', socket => {
     socket.emit('friends:auth-ok', { userId: user.id, username: user.username, friendCode: user.friend_code });
   });
 
+  // ---------------- Leaderboard ----------------
+  const LEADERBOARD_QUERIES = {
+    best_score: {
+      list: `SELECT u.id, u.username, MAX(gr.score)::int AS value
+             FROM game_results gr JOIN users u ON u.id = gr.user_id
+             GROUP BY u.id, u.username ORDER BY value DESC LIMIT 20`,
+      myValue: `SELECT MAX(score)::int AS value FROM game_results WHERE user_id = $1`,
+      higherCount: `SELECT COUNT(*)::int AS n FROM (
+                      SELECT user_id, MAX(score) AS best FROM game_results GROUP BY user_id
+                    ) t WHERE t.best > $1`
+    },
+    wins: {
+      list: `SELECT u.id, u.username, COUNT(*) FILTER (WHERE gr.rank = 1)::int AS value
+             FROM game_results gr JOIN users u ON u.id = gr.user_id
+             GROUP BY u.id, u.username ORDER BY value DESC LIMIT 20`,
+      myValue: `SELECT COUNT(*) FILTER (WHERE rank = 1)::int AS value FROM game_results WHERE user_id = $1`,
+      higherCount: `SELECT COUNT(*)::int AS n FROM (
+                      SELECT user_id, COUNT(*) FILTER (WHERE rank = 1) AS wins FROM game_results GROUP BY user_id
+                    ) t WHERE t.wins > $1`
+    },
+    games: {
+      list: `SELECT u.id, u.username, COUNT(*)::int AS value
+             FROM game_results gr JOIN users u ON u.id = gr.user_id
+             GROUP BY u.id, u.username ORDER BY value DESC LIMIT 20`,
+      myValue: `SELECT COUNT(*)::int AS value FROM game_results WHERE user_id = $1`,
+      higherCount: `SELECT COUNT(*)::int AS n FROM (
+                      SELECT user_id, COUNT(*) AS games FROM game_results GROUP BY user_id
+                    ) t WHERE t.games > $1`
+    }
+  };
+
+  socket.on('leaderboard:get', async ({ category }) => {
+    const q = LEADERBOARD_QUERIES[category];
+    if (!q) return;
+    try {
+      const listRes = await pool.query(q.list);
+      let myRank = null, myValue = 0;
+      const me = socket.data.userId;
+      if (me) {
+        const myValRes = await pool.query(q.myValue, [me]);
+        myValue = myValRes.rows[0].value || 0;
+        const higherRes = await pool.query(q.higherCount, [myValue]);
+        myRank = higherRes.rows[0].n + 1;
+      }
+      socket.emit('leaderboard:data', {
+        category,
+        top: listRes.rows.map(r => ({ id: r.id, username: r.username, value: r.value })),
+        myRank,
+        myValue
+      });
+    } catch (err) {
+      console.error('leaderboard:get error', err);
+    }
+  });
+
   // ---------------- Profile ----------------
   socket.on('profile:get', async () => {
     const me = socket.data.userId;

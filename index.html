@@ -26,6 +26,7 @@
     <button class="menu-item" data-view="account">🔑 Account</button>
     <button class="menu-item" data-view="settings">⚙️ Settings</button>
     <button class="menu-item" data-view="stats">📊 My Stats</button>
+    <button class="menu-item" id="menu-goto-leaderboard-btn">🏆 Leaderboard</button>
     <button class="menu-item" data-view="doodles">🖼 My Doodles</button>
     <button class="menu-item" data-view="howto">📖 How to Play</button>
     <button class="menu-item" data-view="about">ℹ️ About</button>
@@ -140,6 +141,24 @@
     <p id="auth-error" class="error-text"></p>
     <button id="auth-toggle-btn" class="btn btn-text">Don't have an account? Sign up</button>
     <button id="auth-back-btn" class="btn btn-text">← Back</button>
+  </div>
+</section>
+
+<!-- LEADERBOARD -->
+<section id="screen-leaderboard" class="screen">
+  <div class="board-frame settings-card leaderboard-card">
+    <p class="eyebrow">🏆 Global Leaderboard</p>
+
+    <div class="leaderboard-tabs">
+      <button class="lb-tab active" data-category="best_score">Best Score</button>
+      <button class="lb-tab" data-category="wins">Most Wins</button>
+      <button class="lb-tab" data-category="games">Most Games</button>
+    </div>
+
+    <ol id="leaderboard-list" class="scoreboard leaderboard-list"></ol>
+    <p id="leaderboard-my-rank" class="hint-text hidden"></p>
+
+    <button id="leaderboard-back-btn" class="btn btn-text">← Back</button>
   </div>
 </section>
 

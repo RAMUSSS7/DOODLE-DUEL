@@ -546,3 +546,14 @@ body.theme-light .game-topbar, body.theme-light .sidebar, body.theme-light .chat
   background: rgba(0,0,0,0.08); border: none; border-radius: 6px; font-size: 12px; padding: 3px 6px; cursor: pointer;
 }
 .player-list li.muted .p-name { opacity: 0.5; text-decoration: line-through; }
+
+/* ---------- Leaderboard ---------- */
+.leaderboard-card { max-width: 420px; }
+.leaderboard-tabs { display: flex; gap: 6px; margin-bottom: 14px; }
+.lb-tab {
+  flex: 1; background: #fffdf7; border: 2px solid #e3d8b8; border-radius: 10px; padding: 8px 4px;
+  font-size: 12px; font-weight: 800; color: #6b6555; cursor: pointer;
+}
+.lb-tab.active { border-color: #ffcf4d; background: #fff8e0; color: #2c2a24; }
+.leaderboard-list { max-height: 360px; overflow-y: auto; }
+.leaderboard-list li.me { border-color: #5aa9ff; background: #eaf4ff; }
