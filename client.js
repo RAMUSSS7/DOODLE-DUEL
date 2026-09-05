@@ -14,6 +14,7 @@ const savedName = localStorage.getItem('dd_name') || '';
 let hostToken = null;
 let isDrawer = false;
 let currentColor = '#2c2a24';
+let mutedNames = new Set(JSON.parse(localStorage.getItem('dd_muted_names') || '[]'));
 let currentSize = 4;
 let erasing = false;
 let drawing = false;
@@ -369,11 +370,33 @@ function renderPlayerList(players, teamMode, teams) {
       if (p.guessed) li.classList.add('has-guessed');
       if (!p.connected) li.classList.add('disconnected');
       if (p.team) li.classList.add('team-' + p.team);
+      if (mutedNames.has(p.name)) li.classList.add('muted');
       const dot = `<span class="avatar-dot" style="background:${COLORS[i % COLORS.length]}"></span>`;
       const streakTag = p.streak >= 2 ? ` <span class="streak-tag">🔥${p.streak}</span>` : '';
       const offlineTag = !p.connected ? ' <span class="offline-tag">(reconnecting…)</span>' : '';
       const teamTag = p.team ? ` <span class="team-tag team-tag-${p.team}">${p.team}</span>` : '';
       li.innerHTML = `<span class="p-name">${dot}${escapeHtml(p.name)}${teamTag}${streakTag}${offlineTag}</span><span class="p-score">${p.score}</span>`;
+      if (list.id === 'game-player-list' && p.id !== socket.id) {
+        const actions = document.createElement('span');
+        actions.className = 'in-game-actions';
+        const muteBtn = document.createElement('button');
+        muteBtn.textContent = mutedNames.has(p.name) ? '🔇' : '🔊';
+        muteBtn.title = mutedNames.has(p.name) ? 'Unmute' : 'Mute';
+        muteBtn.addEventListener('click', () => {
+          if (mutedNames.has(p.name)) mutedNames.delete(p.name); else mutedNames.add(p.name);
+          localStorage.setItem('dd_muted_names', JSON.stringify([...mutedNames]));
+          li.classList.toggle('muted', mutedNames.has(p.name));
+          muteBtn.textContent = mutedNames.has(p.name) ? '🔇' : '🔊';
+          muteBtn.title = mutedNames.has(p.name) ? 'Unmute' : 'Mute';
+        });
+        const reportBtn = document.createElement('button');
+        reportBtn.textContent = '🚩';
+        reportBtn.title = 'Report';
+        reportBtn.addEventListener('click', () => openReportOverlay(p.name));
+        actions.appendChild(muteBtn);
+        actions.appendChild(reportBtn);
+        li.appendChild(actions);
+      }
       list.appendChild(li);
     });
   });
@@ -546,8 +569,26 @@ document.getElementById('guess-form').addEventListener('submit', e => {
   input.value = '';
 });
 
-socket.on('chat-message', ({ name, text }) => addChat(`<span class="who">${escapeHtml(name)}:</span>${escapeHtml(text)}`));
+socket.on('chat-message', ({ name, text }) => { if (!mutedNames.has(name)) addChat(`<span class="who">${escapeHtml(name)}:</span>${escapeHtml(text)}`); });
 socket.on('system-message', ({ text }) => addChat(escapeHtml(text), true));
+
+// ---------- Report player ----------
+let reportTargetName = null;
+function openReportOverlay(name) {
+  reportTargetName = name;
+  document.getElementById('report-heading').textContent = `Report ${name}`;
+  document.getElementById('report-reason-input').value = '';
+  showOverlay('report-overlay');
+}
+document.getElementById('report-cancel-btn').addEventListener('click', () => hideOverlay('report-overlay'));
+document.getElementById('report-submit-btn').addEventListener('click', () => {
+  const reason = document.getElementById('report-reason-input').value.trim();
+  socket.emit('report-player', { reportedName: reportTargetName, roomCode: localStorage.getItem('dd_room'), reason });
+});
+socket.on('report-submitted', () => {
+  hideOverlay('report-overlay');
+  showToast('🚩 Report submitted. Thank you.');
+});
 socket.on('guess-result', ({ correct, points, fastest, streak, timeLeft }) => {
   if (correct) {
     let msg = `🎉 You guessed it! +${points} points`;
@@ -1240,6 +1281,40 @@ document.getElementById('menu-goto-friends-btn').addEventListener('click', () =>
 });
 document.getElementById('friends-back-btn').addEventListener('click', () => showScreen('screen-home'));
 
+// ---------- Blocked users management ----------
+document.getElementById('manage-blocked-btn').addEventListener('click', () => {
+  socket.emit('friends:get-blocked');
+  showOverlay('blocked-overlay');
+});
+document.getElementById('blocked-close-btn').addEventListener('click', () => hideOverlay('blocked-overlay'));
+socket.on('friends:blocked-list', ({ blocked }) => {
+  const list = document.getElementById('blocked-list');
+  list.innerHTML = '';
+  if (!blocked.length) {
+    list.innerHTML = '<p class="hint-text">You haven\'t blocked anyone.</p>';
+    return;
+  }
+  blocked.forEach(b => {
+    const row = document.createElement('div');
+    row.className = 'public-room-row';
+    row.innerHTML = `<span>${escapeHtml(b.username)}</span>`;
+    const btn = document.createElement('button');
+    btn.className = 'btn btn-secondary btn-small';
+    btn.textContent = 'Unblock';
+    btn.addEventListener('click', () => socket.emit('friends:unblock', { userId: b.id }));
+    row.appendChild(btn);
+    list.appendChild(row);
+  });
+});
+socket.on('friends:blocked', () => {
+  showToast('🚫 User blocked');
+  socket.emit('friends:get-list');
+});
+socket.on('friends:unblocked', () => {
+  showToast('✅ User unblocked');
+  socket.emit('friends:get-blocked');
+});
+
 // ---------- Invite Friends overlay (from lobby) ----------
 document.getElementById('lobby-invite-friends-btn').addEventListener('click', () => {
   socket.emit('friends:get-list');
@@ -1378,6 +1453,14 @@ socket.on('friends:list', ({ friends, incoming }) => {
       inviteBtn.addEventListener('click', () => socket.emit('friends:invite', { friendUserId: f.id, myToken, myName: nameInput.value.trim() || currentUser.username }));
       actions.appendChild(inviteBtn);
     }
+    const blockBtn = document.createElement('button');
+    blockBtn.className = 'btn-decline'; blockBtn.textContent = '🚫 Block';
+    blockBtn.addEventListener('click', () => {
+      if (confirm(`Block ${f.username}? They'll be removed from your friends and won't be able to message or add you.`)) {
+        socket.emit('friends:block', { userId: f.id });
+      }
+    });
+    actions.appendChild(blockBtn);
     li.appendChild(actions);
     list.appendChild(li);
   });

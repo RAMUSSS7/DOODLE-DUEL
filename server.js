@@ -121,6 +121,19 @@ const DIFFICULTY_MULT = { easy: 1, medium: 1.25, hard: 1.5 };
 
 function w(word, difficulty) { return { word, difficulty }; }
 
+// Basic profanity filter for public chat/DMs. Not exhaustive — extend this
+// list as needed. Matches whole words only, case-insensitive.
+const BAD_WORDS = [
+  'fuck', 'shit', 'bitch', 'asshole', 'bastard', 'cunt', 'dick', 'piss',
+  'slut', 'whore', 'faggot', 'nigger', 'retard'
+];
+const BAD_WORDS_RE = BAD_WORDS.map(word => new RegExp(`\\b${word}\\w*`, 'gi'));
+function censorText(text) {
+  let out = String(text || '');
+  BAD_WORDS_RE.forEach(re => { out = out.replace(re, m => '*'.repeat(m.length)); });
+  return out;
+}
+
 const WORD_PACKS = {
   english: [
     w('cat','easy'), w('sun','easy'), w('dog','easy'), w('star','easy'), w('fish','easy'),
@@ -568,6 +581,12 @@ io.on('connection', socket => {
       );
       if (already.rows.length) return socket.emit('friends:error', { message: 'You are already friends.' });
 
+      const blocked = await pool.query(
+        `SELECT 1 FROM blocked_users WHERE (user_id=$1 AND blocked_user_id=$2) OR (user_id=$2 AND blocked_user_id=$1)`,
+        [me, targetId]
+      );
+      if (blocked.rows.length) return socket.emit('friends:error', { message: 'This person is not accepting friend requests.' });
+
       await pool.query(
         `INSERT INTO friend_requests (from_user_id, to_user_id, status)
          VALUES ($1, $2, 'pending')
@@ -635,6 +654,65 @@ io.on('connection', socket => {
   }
   socket.on('friends:get-list', () => { if (socket.data.userId) pushFriendsList(socket.data.userId); });
 
+  // ---------------- Block / Unblock / Report ----------------
+  socket.on('friends:block', async ({ userId }) => {
+    const me = socket.data.userId;
+    if (!me || !userId || userId === me) return;
+    try {
+      await pool.query('INSERT INTO blocked_users (user_id, blocked_user_id) VALUES ($1,$2) ON CONFLICT DO NOTHING', [me, userId]);
+      await pool.query('DELETE FROM friendships WHERE (user_id_a=$1 AND user_id_b=$2) OR (user_id_a=$2 AND user_id_b=$1)', [me, userId]);
+      await pool.query('DELETE FROM friend_requests WHERE (from_user_id=$1 AND to_user_id=$2) OR (from_user_id=$2 AND to_user_id=$1)', [me, userId]);
+      socket.emit('friends:blocked', { userId });
+      pushFriendsList(me);
+    } catch (err) {
+      console.error('friends:block error', err);
+    }
+  });
+
+  socket.on('friends:unblock', async ({ userId }) => {
+    const me = socket.data.userId;
+    if (!me || !userId) return;
+    try {
+      await pool.query('DELETE FROM blocked_users WHERE user_id=$1 AND blocked_user_id=$2', [me, userId]);
+      socket.emit('friends:unblocked', { userId });
+    } catch (err) {
+      console.error('friends:unblock error', err);
+    }
+  });
+
+  socket.on('friends:get-blocked', async () => {
+    const me = socket.data.userId;
+    if (!me) return;
+    try {
+      const rows = await pool.query(
+        `SELECT bu.blocked_user_id AS id, u.username FROM blocked_users bu
+         JOIN users u ON u.id = bu.blocked_user_id WHERE bu.user_id = $1 ORDER BY bu.created_at DESC`,
+        [me]
+      );
+      socket.emit('friends:blocked-list', { blocked: rows.rows });
+    } catch (err) {
+      console.error('friends:get-blocked error', err);
+    }
+  });
+
+  socket.on('report-player', async ({ reportedName, roomCode, reason }) => {
+    try {
+      await pool.query(
+        'INSERT INTO reports (reporter_user_id, reporter_name, reported_name, room_code, reason) VALUES ($1,$2,$3,$4,$5)',
+        [
+          socket.data.userId || null,
+          socket.data.username || null,
+          String(reportedName || '').slice(0, 32),
+          String(roomCode || '').slice(0, 8),
+          String(reason || '').slice(0, 200)
+        ]
+      );
+    } catch (err) {
+      console.error('report-player error', err);
+    }
+    socket.emit('report-submitted');
+  });
+
   socket.on('friends:invite', ({ friendUserId, myToken, myName }) => {
     const me = socket.data.userId;
     if (!me) return;
@@ -687,6 +765,11 @@ io.on('connection', socket => {
         [me, toUserId]
       );
       if (already.rows.length) return socket.emit('friends:error', { message: 'You are already friends.' });
+      const blocked = await pool.query(
+        'SELECT 1 FROM blocked_users WHERE (user_id=$1 AND blocked_user_id=$2) OR (user_id=$2 AND blocked_user_id=$1)',
+        [me, toUserId]
+      );
+      if (blocked.rows.length) return socket.emit('friends:error', { message: 'This person is not accepting friend requests.' });
       await pool.query(
         `INSERT INTO friend_requests (from_user_id, to_user_id, status)
          VALUES ($1, $2, 'pending')
@@ -728,8 +811,14 @@ io.on('connection', socket => {
   socket.on('friends:dm-send', async ({ toUserId, text }) => {
     const me = socket.data.userId;
     if (!me || !text || !text.trim()) return;
-    const clean = text.trim().slice(0, 500);
+    const clean = censorText(text.trim().slice(0, 500));
     try {
+      const blocked = await pool.query(
+        `SELECT 1 FROM blocked_users WHERE (user_id=$1 AND blocked_user_id=$2) OR (user_id=$2 AND blocked_user_id=$1)`,
+        [me, toUserId]
+      );
+      if (blocked.rows.length) return socket.emit('friends:error', { message: 'You can\'t message this person.' });
+
       const result = await pool.query(
         'INSERT INTO messages (from_user_id, to_user_id, text) VALUES ($1,$2,$3) RETURNING id, created_at',
         [me, toUserId, clean]
@@ -977,7 +1066,7 @@ io.on('connection', socket => {
       const everyoneGuessed = room.players.filter(p => p.connected && p.token !== drawer.token).every(p => p.guessedThisRound);
       if (everyoneGuessed) endRound(room, 'all-guessed');
     } else {
-      io.to(room.code).emit('chat-message', { name: player.name, text });
+      io.to(room.code).emit('chat-message', { name: player.name, text: censorText(text) });
     }
   });
 

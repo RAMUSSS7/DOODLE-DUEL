@@ -535,3 +535,14 @@ body.theme-light .game-topbar, body.theme-light .sidebar, body.theme-light .chat
 /* ---------- Phase 3: friends upgrades ---------- */
 .btn-add-friend { background: #ffcf4d; color: #5c4400; border: none; border-radius: 8px; padding: 4px 10px; font-size: 11px; font-weight: 800; cursor: pointer; }
 #lobby-invite-friends-btn.hidden { display: none; }
+
+/* ---------- Phase 4: safety ---------- */
+#report-reason-input {
+  width: 100%; min-height: 70px; border-radius: 10px; border: 2px solid #e3d8b8; padding: 10px;
+  font-size: 13px; resize: vertical; font-family: inherit;
+}
+.player-list li .in-game-actions { display: flex; gap: 4px; }
+.player-list li .in-game-actions button {
+  background: rgba(0,0,0,0.08); border: none; border-radius: 6px; font-size: 12px; padding: 3px 6px; cursor: pointer;
+}
+.player-list li.muted .p-name { opacity: 0.5; text-decoration: line-through; }

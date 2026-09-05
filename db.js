@@ -72,6 +72,23 @@ async function initSchema() {
       played_at TIMESTAMPTZ NOT NULL DEFAULT now(),
       PRIMARY KEY (user_id, played_with_id)
     );
+
+    CREATE TABLE IF NOT EXISTS blocked_users (
+      user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+      blocked_user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+      created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+      PRIMARY KEY (user_id, blocked_user_id)
+    );
+
+    CREATE TABLE IF NOT EXISTS reports (
+      id SERIAL PRIMARY KEY,
+      reporter_user_id INTEGER REFERENCES users(id) ON DELETE SET NULL,
+      reporter_name TEXT,
+      reported_name TEXT NOT NULL,
+      room_code TEXT,
+      reason TEXT,
+      created_at TIMESTAMPTZ NOT NULL DEFAULT now()
+    );
   `);
 }
 

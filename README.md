@@ -65,6 +65,15 @@ that way both locally and in your GitHub repo, or the server won't find them.
   games played / wins / best score (tracked automatically after every
   multiplayer game you finish while logged in)
 
+### Safety
+- Basic **profanity filter** applied to game chat and direct messages
+- **Block/Unblock** another account — removes any friendship, and blocked
+  users can't send you friend requests or DMs
+- **Report a player** during a game (with an optional note) — reports are
+  logged to the database for later review
+- **Mute** a player's chat locally during a game (client-side only, no
+  account needed)
+
 ## Run it locally
 
 You need a PostgreSQL database for the accounts/friends features (the core

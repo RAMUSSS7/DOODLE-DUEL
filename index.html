@@ -205,6 +205,7 @@
       <ul id="recent-played-list" class="player-list"></ul>
     </div>
 
+    <button id="manage-blocked-btn" class="btn btn-text">🚫 Manage blocked users</button>
     <button id="friends-back-btn" class="btn btn-text">← Back</button>
   </div>
 </section>
@@ -350,6 +351,28 @@
     <p class="eyebrow">Invite a friend</p>
     <div id="invite-friends-list" class="public-rooms-list"></div>
     <button id="invite-friends-close-btn" class="btn btn-secondary">Close</button>
+  </div>
+</div>
+
+<!-- BLOCKED USERS OVERLAY -->
+<div id="blocked-overlay" class="overlay hidden">
+  <div class="board-frame browse-card">
+    <p class="eyebrow">Blocked users</p>
+    <div id="blocked-list" class="public-rooms-list"></div>
+    <button id="blocked-close-btn" class="btn btn-secondary">Close</button>
+  </div>
+</div>
+
+<!-- REPORT PLAYER OVERLAY -->
+<div id="report-overlay" class="overlay hidden">
+  <div class="board-frame browse-card">
+    <p class="eyebrow" id="report-heading">Report player</p>
+    <div class="field">
+      <label for="report-reason-input">What happened? (optional)</label>
+      <textarea id="report-reason-input" maxlength="200" placeholder="Describe the issue…"></textarea>
+    </div>
+    <button id="report-submit-btn" class="btn btn-primary btn-small">Submit report</button>
+    <button id="report-cancel-btn" class="btn btn-text">Cancel</button>
   </div>
 </div>
 
